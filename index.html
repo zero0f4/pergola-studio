@@ -66,6 +66,7 @@
   <div class="ctl"><label>dakhout h.o.h. <b id="vlam">35</b></label><input type="range" id="slam" min="25" max="80" step="1" value="35"></div>
   <div class="ctl"><label>voorhoekpaal terug <b id="vterug">35</b></label><input type="range" id="sterug" min="0" max="80" step="5" value="35"></div>
   <div class="ctl"><label>kleine schoor (maat) <b id="vA">90</b></label><input type="range" id="sA" min="60" max="120" step="5" value="90"></div>
+  <div class="ctl"><label>dwarsbalk positie (v.a. achter) <b id="vdz">220</b></label><input type="range" id="sdz" min="60" max="480" step="5" value="220"></div>
 
   <h2>Onderdelen</h2>
   <div class="chks">
@@ -80,6 +81,7 @@
   <div class="chk"><label><input type="checkbox" id="cBalk"> dak 15×15 balken</label></div>
   <div class="chk"><label><input type="checkbox" id="cMas"> liggers massief 15×15</label></div>
   <div class="chk"><label><input type="checkbox" id="cTui"> tuikabels (hoge achterpalen +100)</label></div>
+  <div class="chk"><label><input type="checkbox" id="cDwars"> extra dwarsbalk (schuifbaar)</label></div>
   </div>
 
   <h2>Fundering — drukpalen</h2>
@@ -122,10 +124,10 @@ const cv = document.getElementById('c');
 const ctx = cv.getContext('2d');
 
 /* ---------- parameters ---------- */
-const P = { B:365, B2:365, zs:200, D:320, duo:90, over:30, H:260, lam:35, terug:35, A:90, bel:25 };
+const P = { B:365, B2:365, zs:200, D:320, duo:90, over:30, H:260, lam:35, terug:35, A:90, dz:220, bel:25 };
 // lamel-lengte op diepte z (vanaf achter): tot P.zs de achterbreedte, daarna lineair uitwaaierend naar P.B2
 function lamLen(cz){ const zs=Math.min(P.zs,P.D-10); return cz<=zs? P.B : P.B + (P.B2-P.B)*(cz-zs)/(P.D-zs); }
-const opt = { schoorZ:true, schoorP:true, panZ:true, panP:true, wandLat:false, wandRol:false, hoekpaal:true, doek:true, massief:false, balk:false, poeren:true, tui:false, fundDruk:'basic', fundTrek:'tegel' };
+const opt = { schoorZ:true, schoorP:true, panZ:true, panP:true, wandLat:false, wandRol:false, hoekpaal:true, doek:true, massief:false, balk:false, poeren:true, tui:false, dwars:false, fundDruk:'basic', fundTrek:'tegel' };
 let doekDicht=false, showK=true, showM=true;
 
 /* ---------- model-opbouw (alle maten in cm) ----------
@@ -247,6 +249,8 @@ function buildModel(){
   const eF=P.B2-P.B;
   addBox(0,H-20,-5, B,H,0, WOOD);
   addBox(-eF,H-20,D, B,H,D+5, WOOD);
+  // extra dwarsbalk tussen de sandwich-liggers (schuifbaar)
+  if(opt.dwars){ const dzc=Math.min(Math.max(P.dz,15),D-8); addBox(42.5,H-20,dzc-2.5, B-42.5,H,dzc+2.5, WOOD); }
   // kleine schoren per zijde (vinkjes)
   if(opt.schoorZ) addKarbeel(xZ, zV+7.5, A, H);
   if(opt.schoorP) addKarbeel(xP, zV+7.5, A, H);
@@ -437,7 +441,7 @@ function bindSlider(id, key, label, suffix){
 bindSlider('sB','B','vB'); bindSlider('sB2','B2','vB2'); bindSlider('szs','zs','vzs');
 bindSlider('sD','D','vD'); bindSlider('sduo','duo','vduo');
 bindSlider('sover','over','vover'); bindSlider('sH','H','vH'); bindSlider('slam','lam','vlam');
-bindSlider('sterug','terug','vterug'); bindSlider('sA','A','vA'); bindSlider('sbel','bel','vbel',' kg/m²');
+bindSlider('sterug','terug','vterug'); bindSlider('sA','A','vA'); bindSlider('sdz','dz','vdz'); bindSlider('sbel','bel','vbel',' kg/m²');
 
 function bindChk(id,key){
   const el=document.getElementById(id);
@@ -446,7 +450,7 @@ function bindChk(id,key){
 }
 bindChk('cSZ','schoorZ'); bindChk('cSP','schoorP'); bindChk('cPanZ','panZ'); bindChk('cPanP','panP');
 bindChk('cWand','wandLat'); bindChk('cRol','wandRol');
-bindChk('cHoek','hoekpaal'); bindChk('cDoek','doek'); bindChk('cMas','massief'); bindChk('cBalk','balk'); bindChk('cTui','tui');
+bindChk('cHoek','hoekpaal'); bindChk('cDoek','doek'); bindChk('cMas','massief'); bindChk('cBalk','balk'); bindChk('cTui','tui'); bindChk('cDwars','dwars');
 function bindRadio(name,key){
   for(const el of document.querySelectorAll(`input[name=${name}]`)){
     if(el.checked) opt[key]=el.value;
@@ -509,22 +513,34 @@ function kosten(fx){
   const nP=opt.hoekpaal?5:4, nS=(opt.schoorZ?1:0)+(opt.schoorP?1:0);
   const nLat=Math.floor((P.H-59)/10)+1, latL=P.duo-16;
   const r=[]; const add=(o,q,u,pr,br,shop)=>r.push({o,q:+q,u,pr,tot:q*pr,br,shop});
+  const stp=(hl,perM)=>+(hl/100*perM).toFixed(2);            // prijs per handelsstuk
+  const hlPaal=handelslengte(P.H+5);
   if(opt.tui){
-    add('staanders 15×15 zwart (à 300)', (nP-2)*3,'m¹',20.0,'1','vanviegen.com');
-    add('verhoogde achterpalen 15×15 zwart (à 400)', 8,'m¹',20.0,'1','vanviegen.com');
-    add('tuikabelset RVS ø5 + spanschroef/ogen', 2,'st',24,'8','gadero.nl');
-  } else add('staanders 15×15 zwart', nP*3,'m¹',20.0,'1','vanviegen.com');
-  if(nS) add('kleine schoren 15×15 zwart (uit 1× 300)', 3,'m¹',20.0,'1','vanviegen.com');
-  if(opt.massief) add('liggers massief 15×15 zwart', 2*handelslengte(P.D)/100,'m¹',20.0,'1','vanviegen.com');
-  else add('sandwich-balken 5×20 zwart', 4*handelslengte(P.D)/100,'m¹',8.5,'2','houtgemak.nl');
-  add('koppelbalk 5×20 zwart (achter)', handelslengte(P.B)/100,'m¹',8.5,'2','houtgemak.nl');
-  add('voorbalk 5×20 zwart', handelslengte(P.B2)/100,'m¹',8.5,'2','houtgemak.nl');
-  const maxB=Math.max(P.B,P.B2);
-  if(opt.balk) add('dakbalken 15×15 zwart', fx.nLam*handelslengte(maxB+10)/100,'m¹',20.0,'1','vanviegen.com');
-  else add('lamellen 4,5×7 zwart', fx.nLam*handelslengte(maxB+10)/100,'m¹',2.7,'3','houtgemak.nl');
+    add(`douglas paal 15×15 – ${hlPaal} cm – zwart geïmpregneerd (staanders)`, nP-2,'st',stp(hlPaal,20),'1','vanviegen.com');
+    add(`douglas paal 15×15 – ${handelslengte(P.H+105)} cm – zwart (verhoogde achterpalen)`, 2,'st',stp(handelslengte(P.H+105),20),'1','vanviegen.com');
+    add('tuikabelset RVS ø5 + spanschroef + oogbouten', 2,'st',24,'8','gadero.nl');
+  } else add(`douglas paal 15×15 – ${hlPaal} cm – zwart geïmpregneerd (staanders)`, nP,'st',stp(hlPaal,20),'1','vanviegen.com');
+  if(nS) add('douglas paal 15×15 – 300 cm – zwart (→ 2 kleine schoren à 127)', 1,'st',stp(300,20),'1','vanviegen.com');
+  const hlL=handelslengte(P.D);
+  if(opt.massief) add(`douglas balk 15×15 – ${hlL} cm – zwart (massieve liggers, op ${P.D} zagen)`, 2,'st',stp(hlL,20),'1','vanviegen.com');
+  else add(`douglas balk 5×20 – ${hlL} cm – zwart (sandwich-liggers, op ${P.D} zagen)`, 4,'st',stp(hlL,8.5),'2','houtgemak.nl');
+  add(`douglas balk 5×20 – ${handelslengte(P.B)} cm – zwart (koppelbalk achter, op ${P.B} zagen)`, 1,'st',stp(handelslengte(P.B),8.5),'2','houtgemak.nl');
+  add(`douglas balk 5×20 – ${handelslengte(P.B2)} cm – zwart (voorbalk, op ${P.B2} zagen)`, 1,'st',stp(handelslengte(P.B2),8.5),'2','houtgemak.nl');
+  if(opt.dwars) add(`douglas balk 5×20 – ${handelslengte(P.B-85)} cm – zwart (extra dwarsbalk)`, 1,'st',stp(handelslengte(P.B-85),8.5),'2','houtgemak.nl');
+  const maxB=Math.max(P.B,P.B2), hlD=handelslengte(maxB+10);
+  if(opt.balk) add(`douglas balk 15×15 – ${hlD} cm – zwart (dakbalken)`, fx.nLam,'st',stp(hlD,20),'1','vanviegen.com');
+  else add(`douglas regel 4,5×7 – ${hlD} cm – zwart (daklamellen, op smetlijn afzagen)`, fx.nLam,'st',stp(hlD,2.7),'3','houtgemak.nl');
   const nPan=(opt.panZ?1:0)+(opt.panP?1:0);
-  if(nPan){ add('jaloezie-latten 2,2×7 zwart (panelen)', Math.round(nLat*nPan*latL/100),'m¹',1.9,'4','houtgemak.nl'); add('paneel-regels 4,5×7 zwart', nPan*2*(P.H-50)/100,'m¹',2.7,'3','houtgemak.nl'); }
-  if(opt.wandLat){ add('jaloezie-latten 2,2×7 zwart (achterwand)', Math.round(nLat*(P.B-75)/100),'m¹',1.9,'4','houtgemak.nl'); add('wand-regels 4,5×7 zwart', 2*(P.H-50)/100,'m¹',2.7,'3','houtgemak.nl'); }
+  if(nPan){
+    const perStuk=Math.max(1,Math.floor(300/(latL+2)));
+    add(`douglas lat 2,2×7 – 300 cm – zwart (→ ${perStuk} paneellatten à ${latL} per stuk)`, Math.ceil(nLat*nPan/perStuk),'st',stp(300,1.9),'4','houtgemak.nl');
+    add('douglas regel 4,5×7 – 250 cm – zwart (paneel-regels à 210)', nPan*2,'st',stp(250,2.7),'3','houtgemak.nl');
+  }
+  if(opt.wandLat){
+    add(`douglas lat 2,2×7 – ${handelslengte(P.B-75)} cm – zwart (achterwand-latten à ${P.B-75})`, nLat,'st',stp(handelslengte(P.B-75),1.9),'4','houtgemak.nl');
+    add('douglas regel 4,5×7 – 250 cm – zwart (wand-regels à 210)', 2,'st',stp(250,2.7),'3','houtgemak.nl');
+  }
+  add('douglas regel 7×7 – 250 cm – zwart (→ karbelen à 75)', 1,'st',8,'3','houtgemak.nl');
   if(opt.wandRol) add('buitenrolgordijn op maat (±'+((P.B-75)/100).toFixed(1)+' × 2,1 m, antraciet)', 1,'st',150,'8','gadero.nl / jysk.nl');
   if(opt.poeren){
     const nDruk = opt.tui? nP : nP-1;
@@ -552,7 +568,10 @@ function kosten(fx){
     const m3=(fx.blokL/100*0.35 + Math.max(120,P.duo+50)/100*0.30 + (opt.hoekpaal?0.112:0));
     add('mortelbeton blokken (geleverd)', +m3.toFixed(2),'m³',200,'7','ikwilbetonbestellen.nl');
   }
-  if(opt.doek){ add('harmonicadoek op maat', +(((P.B-85)/100)*((P.D-50)/100)).toFixed(1),'m²',22,'8','gadero.nl (Nesling)'); add('RVS-kabelset + ogen', 1,'set',55,'8','gadero.nl'); }
+  if(opt.doek){
+    add(`harmonicadoek op maat ±${P.B-85} × ${P.D-50} cm – antraciet, incl. ringen`, 1,'st',Math.round(((P.B-85)/100)*((P.D-50)/100)*22),'8','gadero.nl (Nesling)');
+    add('RVS-kabelset ø4 + spanschroeven + oogbouten', 1,'set',55,'8','gadero.nl');
+  }
   // kleinmateriaal, uitgesplitst
   add('slotbouten M12 × 260 vz + moer/ring', 6+2*nS+(opt.hoekpaal?6:4),'st',1.20,'9','wovar.nl');
   if(nS) add('slotbouten M12 × 320 vz (schoorvoeten)', 2*nS,'st',1.60,'9','wovar.nl');
@@ -601,6 +620,7 @@ function openTekening(){
   for(const [lx,lw] of ligs) b.push(`<rect x="${px(lx)}" y="${py(D)}" width="${lw*s}" height="${D*s}" fill="#111"/>`);
   b.push(`<rect x="${px(-exF)}" y="${py(D)-5*s}" width="${P.B2*s}" height="${5*s}" fill="#111"/>`);
   b.push(`<rect x="${px(0)}" y="${py(0)}" width="${B*s}" height="${5*s}" fill="#111"/>`);
+  if(opt.dwars){ const dzc=Math.min(Math.max(P.dz,15),D-8); b.push(`<rect x="${px(42.5)}" y="${py(dzc)-2.5*s}" width="${(B-85)*s}" height="${5*s}" fill="#111"/>`); b.push(`<text class="dt" x="${px(B/2)}" y="${py(dzc)-6}">dwarsbalk · ${dzc} v.a. achter</text>`); }
   const posts=[[30,zA],[30,zV],[B-30,zA],[B-30,zV]]; if(opt.hoekpaal) posts.push([B-30,zH]);
   for(const [X,Z] of posts) b.push(`<rect x="${px(X-7.5)}" y="${py(Z+7.5)}" width="${15*s}" height="${15*s}" fill="#000"/>`);
   if(opt.paneel){ b.push(`<rect x="${px(30-1.5)}" y="${py(zV-7.5)}" width="${3*s}" height="${(duo-15)*s}" fill="#8a6f4d"/>`); b.push(`<rect x="${px(B-30-1.5)}" y="${py(zV-7.5)}" width="${3*s}" height="${(duo-15)*s}" fill="#8a6f4d"/>`); }
@@ -772,6 +792,7 @@ function openTekening(){
   } else zl.push(['staander','15 × 15',H,nP,`${nP}× ${handelslengte(H)}`]);
   if(opt.massief) zl.push(['ligger massief','15 × 15',D,2,`2× ${handelslengte(D)}`]);
   else zl.push(['sandwich-balk','5 × 20',D,4,`4× ${handelslengte(D)}`]);
+  if(opt.dwars) zl.push(['extra dwarsbalk (tussen de liggers)','5 × 20',B-85,1,`positie ${P.dz} v.a. achter`]);
   zl.push(['koppelbalk (achterrand, vol breed)','5 × 20',B,1,`1× ${handelslengte(B)}`]);
   zl.push(['voorbalk (voorrand, vol breed)','5 × 20',P.B2,1,`1× ${handelslengte(P.B2)}`]);
   const lamLbl = P.B2===B? `${B}` : `${Math.min(B,P.B2)}–${Math.max(B,P.B2)} (uitwaaierend v.a. ${Math.min(P.zs,D-10)})`;
