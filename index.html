@@ -66,7 +66,7 @@
   <div class="ctl"><label>dakhout h.o.h. <b id="vlam">35</b></label><input type="range" id="slam" min="25" max="80" step="1" value="35"></div>
   <div class="ctl"><label>voorhoekpaal terug <b id="vterug">35</b></label><input type="range" id="sterug" min="0" max="80" step="5" value="35"></div>
   <div class="ctl"><label>kleine schoor (maat) <b id="vA">90</b></label><input type="range" id="sA" min="60" max="120" step="5" value="90"></div>
-  <div class="ctl"><label>dwarsbalk positie (v.a. achter) <b id="vdz">220</b></label><input type="range" id="sdz" min="60" max="480" step="5" value="220"></div>
+  <div class="ctl"><label>dwarsbalk hoogte <b id="vdz">100</b></label><input type="range" id="sdz" min="30" max="230" step="5" value="100"></div>
 
   <h2>Onderdelen</h2>
   <div class="chks">
@@ -81,7 +81,7 @@
   <div class="chk"><label><input type="checkbox" id="cBalk"> dak 15×15 balken</label></div>
   <div class="chk"><label><input type="checkbox" id="cMas"> liggers massief 15×15</label></div>
   <div class="chk"><label><input type="checkbox" id="cTui"> tuikabels (hoge achterpalen +100)</label></div>
-  <div class="chk"><label><input type="checkbox" id="cDwars"> extra dwarsbalk (schuifbaar)</label></div>
+  <div class="chk"><label><input type="checkbox" id="cDwars"> dwarsbalk tussen de achterpalen (hoogte schuifbaar)</label></div>
   </div>
 
   <h2>Fundering — drukpalen</h2>
@@ -124,7 +124,7 @@ const cv = document.getElementById('c');
 const ctx = cv.getContext('2d');
 
 /* ---------- parameters ---------- */
-const P = { B:365, B2:365, zs:200, D:320, duo:90, over:30, H:260, lam:35, terug:35, A:90, dz:220, bel:25 };
+const P = { B:365, B2:365, zs:200, D:320, duo:90, over:30, H:260, lam:35, terug:35, A:90, dz:100, bel:25 };
 // lamel-lengte op diepte z (vanaf achter): tot P.zs de achterbreedte, daarna lineair uitwaaierend naar P.B2
 function lamLen(cz){ const zs=Math.min(P.zs,P.D-10); return cz<=zs? P.B : P.B + (P.B2-P.B)*(cz-zs)/(P.D-zs); }
 const opt = { schoorZ:true, schoorP:true, panZ:true, panP:true, wandLat:false, wandRol:false, hoekpaal:true, doek:true, massief:false, balk:false, poeren:true, tui:false, dwars:false, fundDruk:'basic', fundTrek:'tegel' };
@@ -249,8 +249,8 @@ function buildModel(){
   const eF=P.B2-P.B;
   addBox(0,H-20,-5, B,H,0, WOOD);
   addBox(-eF,H-20,D, B,H,D+5, WOOD);
-  // extra dwarsbalk tussen de sandwich-liggers (schuifbaar)
-  if(opt.dwars){ const dzc=Math.min(Math.max(P.dz,15),D-8); addBox(42.5,H-20,dzc-2.5, B-42.5,H,dzc+2.5, WOOD); }
+  // dwarsbalk tussen de achterpalen, hoogte schuifbaar (leuning / plank / rolgordijn-rail)
+  if(opt.dwars){ const dzc=Math.min(Math.max(P.dz,20),H-30); addBox(xZ+7.5,dzc-7.5,zA-2.5, xP-7.5,dzc+7.5,zA+2.5, WOOD); }
   // kleine schoren per zijde (vinkjes)
   if(opt.schoorZ) addKarbeel(xZ, zV+7.5, A, H);
   if(opt.schoorP) addKarbeel(xP, zV+7.5, A, H);
@@ -526,7 +526,7 @@ function kosten(fx){
   else add(`douglas balk 5×20 – ${hlL} cm – zwart (sandwich-liggers, op ${P.D} zagen)`, 4,'st',stp(hlL,8.5),'2','houtgemak.nl');
   add(`douglas balk 5×20 – ${handelslengte(P.B)} cm – zwart (koppelbalk achter, op ${P.B} zagen)`, 1,'st',stp(handelslengte(P.B),8.5),'2','houtgemak.nl');
   add(`douglas balk 5×20 – ${handelslengte(P.B2)} cm – zwart (voorbalk, op ${P.B2} zagen)`, 1,'st',stp(handelslengte(P.B2),8.5),'2','houtgemak.nl');
-  if(opt.dwars) add(`douglas balk 5×20 – ${handelslengte(P.B-85)} cm – zwart (extra dwarsbalk)`, 1,'st',stp(handelslengte(P.B-85),8.5),'2','houtgemak.nl');
+  if(opt.dwars) add(`douglas balk 5×15 – ${handelslengte(P.B-75)} cm – zwart (dwarsbalk achtervlak, hoogte ${P.dz})`, 1,'st',stp(handelslengte(P.B-75),6.5),'2','houtgemak.nl');
   const maxB=Math.max(P.B,P.B2), hlD=handelslengte(maxB+10);
   if(opt.balk) add(`douglas balk 15×15 – ${hlD} cm – zwart (dakbalken)`, fx.nLam,'st',stp(hlD,20),'1','vanviegen.com');
   else add(`douglas regel 4,5×7 – ${hlD} cm – zwart (daklamellen, op smetlijn afzagen)`, fx.nLam,'st',stp(hlD,2.7),'3','houtgemak.nl');
@@ -620,7 +620,7 @@ function openTekening(){
   for(const [lx,lw] of ligs) b.push(`<rect x="${px(lx)}" y="${py(D)}" width="${lw*s}" height="${D*s}" fill="#111"/>`);
   b.push(`<rect x="${px(-exF)}" y="${py(D)-5*s}" width="${P.B2*s}" height="${5*s}" fill="#111"/>`);
   b.push(`<rect x="${px(0)}" y="${py(0)}" width="${B*s}" height="${5*s}" fill="#111"/>`);
-  if(opt.dwars){ const dzc=Math.min(Math.max(P.dz,15),D-8); b.push(`<rect x="${px(42.5)}" y="${py(dzc)-2.5*s}" width="${(B-85)*s}" height="${5*s}" fill="#111"/>`); b.push(`<text class="dt" x="${px(B/2)}" y="${py(dzc)-6}">dwarsbalk · ${dzc} v.a. achter</text>`); }
+  if(opt.dwars){ b.push(`<line x1="${px(37.5)}" y1="${py(zA)}" x2="${px(B-37.5)}" y2="${py(zA)}" stroke="#8a6f4d" stroke-width="4" stroke-dasharray="8 5"/>`); b.push(`<text class="dt" x="${px(B/2)}" y="${py(zA)+16}" fill="#8a6f4d">dwarsbalk achtervlak · hoogte ${P.dz}</text>`); }
   const posts=[[30,zA],[30,zV],[B-30,zA],[B-30,zV]]; if(opt.hoekpaal) posts.push([B-30,zH]);
   for(const [X,Z] of posts) b.push(`<rect x="${px(X-7.5)}" y="${py(Z+7.5)}" width="${15*s}" height="${15*s}" fill="#000"/>`);
   if(opt.paneel){ b.push(`<rect x="${px(30-1.5)}" y="${py(zV-7.5)}" width="${3*s}" height="${(duo-15)*s}" fill="#8a6f4d"/>`); b.push(`<rect x="${px(B-30-1.5)}" y="${py(zV-7.5)}" width="${3*s}" height="${(duo-15)*s}" fill="#8a6f4d"/>`); }
@@ -639,7 +639,7 @@ function openTekening(){
   const bovenSvg=`<svg viewBox="0 0 ${bw} ${bh}" xmlns="http://www.w3.org/2000/svg">${b.join('')}</svg>`;
 
   /* — ZIJAANZICHT zweef-duo (voorzijde links) — */
-  const s2=1.45, M2=70, GR=M2+ (H+20)*s2;
+  const s2=1.45, M2=70, GR=M2+ (H+(opt.tui?125:20))*s2;
   const qx=z=>M2+(D-z)*s2+40, qy=y=>GR-y*s2;
   const zw=M2*2+D*s2+130, zh2=GR+95*s2;
   let z2=[];
@@ -653,7 +653,20 @@ function openTekening(){
     z2.push(`<rect x="${qx(zV+20)}" y="${GR}" width="${fx.blokL*s2}" height="${70*s2}" fill="none" stroke="#777" stroke-dasharray="5 4"/>`);
     z2.push(`<text class="dt" x="${qx(zV+20)+fx.blokL*s2/2}" y="${GR+70*s2+14}">gestort blok ${fx.blokL} × 50 × 70 · 2× H-anker · achterste = trekanker (dwarsstaaf ø12)</text>`);
   }
-  for(const Z of [zA,zV]) z2.push(`<rect x="${qx(Z+7.5)}" y="${qy(opt.massief?H-20:H)}" width="${15*s2}" height="${(opt.massief?H-20:H)*s2}" fill="#1c1b1a"/>`);
+  for(const Z of [zA,zV]){
+    const topZ = (opt.tui && Z===zA)? H+100 : (opt.massief?H-20:H);
+    z2.push(`<rect x="${qx(Z+7.5)}" y="${qy(topZ)}" width="${15*s2}" height="${topZ*s2}" fill="#1c1b1a"/>`);
+  }
+  if(opt.tui){
+    z2.push(`<line x1="${qx(zA)}" y1="${qy(H+96)}" x2="${qx(D-4)}" y2="${qy(H-6)}" stroke="#555" stroke-width="2.5"/>`);
+    z2.push(`<text class="dt" x="${qx((zA+D)/2)}" y="${qy(H+60)}">tuikabel RVS ø5 · ±${fx.kabelT50} kg · spanschroef, jaarlijks naspannen</text>`);
+    z2.push(dimV(qy(H+100),qy(H),qx(zA)-24,'100'));
+  }
+  if(opt.dwars){
+    const dzc=Math.min(Math.max(P.dz,20),H-30);
+    z2.push(`<rect x="${qx(zA+2.5)}" y="${qy(dzc+7.5)}" width="${5*s2}" height="${15*s2}" fill="#555"/>`);
+    z2.push(`<text class="dt" x="${qx(zA)+56}" y="${qy(dzc)}">dwarsbalk · hoogte ${dzc}</text>`);
+  }
   z2.push(`<rect x="${qx(D)}" y="${qy(H)}" width="${D*s2}" height="${20*s2}" fill="#000"/>`);
   for(let i=0;i<fx.nLam;i++){ const cz=dhOff+i*sLam; z2.push(`<rect x="${qx(cz+dh/2)}" y="${qy(H+(opt.balk?15:7))}" width="${dh*s2}" height="${(opt.balk?15:7)*s2}" fill="#3a3835"/>`); }
   if(opt.schoorZ){
@@ -792,7 +805,7 @@ function openTekening(){
   } else zl.push(['staander','15 × 15',H,nP,`${nP}× ${handelslengte(H)}`]);
   if(opt.massief) zl.push(['ligger massief','15 × 15',D,2,`2× ${handelslengte(D)}`]);
   else zl.push(['sandwich-balk','5 × 20',D,4,`4× ${handelslengte(D)}`]);
-  if(opt.dwars) zl.push(['extra dwarsbalk (tussen de liggers)','5 × 20',B-85,1,`positie ${P.dz} v.a. achter`]);
+  if(opt.dwars) zl.push(['dwarsbalk achtervlak (tussen de achterpalen)','5 × 15',B-75,1,`op hoogte ${P.dz} · 2× M12 per kop`]);
   zl.push(['koppelbalk (achterrand, vol breed)','5 × 20',B,1,`1× ${handelslengte(B)}`]);
   zl.push(['voorbalk (voorrand, vol breed)','5 × 20',P.B2,1,`1× ${handelslengte(P.B2)}`]);
   const lamLbl = P.B2===B? `${B}` : `${Math.min(B,P.B2)}–${Math.max(B,P.B2)} (uitwaaierend v.a. ${Math.min(P.zs,D-10)})`;
