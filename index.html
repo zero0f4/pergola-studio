@@ -360,11 +360,18 @@ function draw(){
     dim(Pr(-40-eF,2,P.over), Pr(-40-eF,2,zV), `${P.duo}`);
     dim(Pr(-40-eF,2,0), Pr(-40-eF,2,P.over), `${P.over}`);
     dim(Pr(-75-eF,2,P.over), Pr(-75-eF,2,P.D), `${P.D-P.over} v.a. achterpaal`);
-    dim(Pr(37.5,2,-55), Pr(P.B-37.5,2,-55), `${P.B-75} vrij tussen de achterpalen`);
+    wit(Pr(37.5,2,P.over-7.5), Pr(37.5,2,-55)); wit(Pr(P.B-37.5,2,P.over-7.5), Pr(P.B-37.5,2,-55));
+    dim(Pr(37.5,2,-55), Pr(P.B-37.5,2,-55), `${P.B-75} binnenwerks (paalvlak–paalvlak)`);
     dim(Pr(xr,0,P.D+35), Pr(xr,P.H+7,P.D+35), `±${P.H+7} hoog`);
   }
 }
 function poly(pts){ ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.closePath(); ctx.fill(); }
+function wit(a,b){ // verwijslijn (van object naar maatlijn)
+  if(!a||!b) return;
+  ctx.strokeStyle='#9a958c'; ctx.lineWidth=1; ctx.setLineDash([3,4]);
+  ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+  ctx.setLineDash([]);
+}
 function dim(a,b,txt){
   if(!a||!b) return;
   const c='#6E6A61';
@@ -649,7 +656,9 @@ function openTekening(){
   if(opt.schoorP) b.push(`<line x1="${px(B-30)}" y1="${py(zV)}" x2="${px(B-30)}" y2="${py(zV+A)}" stroke="#8a6f4d" stroke-width="6" stroke-dasharray="8 5"/>`);
   b.push(dimH(px(-exF),px(B),py(D)-16,`${P.B2}${P.B2!==B?' voor (verbreding aan de zweef-zijde)':''}`));
   if(P.B2!==B) b.push(dimH(px(0),px(B),py(0)+38,`${B} achter`));
-  b.push(dimH(px(37.5),px(B-37.5),py(0)+56,`${B-75} vrij tussen de achterpalen`));
+  b.push(`<line class="dim" x1="${px(37.5)}" y1="${py(zA-7.5)}" x2="${px(37.5)}" y2="${py(0)+56}" stroke-dasharray="3 4"/>`);
+  b.push(`<line class="dim" x1="${px(B-37.5)}" y1="${py(zA-7.5)}" x2="${px(B-37.5)}" y2="${py(0)+56}" stroke-dasharray="3 4"/>`);
+  b.push(dimH(px(37.5),px(B-37.5),py(0)+56,`${B-75} binnenwerks tussen de achterpalen (h.o.h. ${B-60})`));
   b.push(dimH(px(30),px(B-30),py(D)-36,`${B-60} h.o.h. balklijnen`));
   b.push(dimV(py(D),py(zV),px(B)+18,`${zweef} zweef`));
   b.push(dimV(py(zV),py(zA),px(B)+18,`${duo}`));
