@@ -1,0 +1,11 @@
+services:
+  pergola-studio:
+    image: nginx:alpine
+    container_name: pergola-studio
+    restart: unless-stopped
+    ports:
+      - "3048:80"
+    volumes:
+      - /DATA/AppData/pergola-studio:/usr/share/nginx/html:ro
+    labels:
+      - "com.zima.app.title=Pergola Studio"

@@ -523,6 +523,7 @@ function openTekening(){
   const zweef=D-duo-over, zA=over, zV=over+duo, zH=D-terug;
   const nP=opt.hoekpaal?5:4, nS=(opt.schoorZ?1:0)+(opt.schoorP?1:0);
   const nLat=Math.floor((H-59)/10)+1, latL=duo-16;
+  const nPan2=(opt.panZ?1:0)+(opt.panP?1:0);
   const dh=opt.balk?15:4.5, dhOff=dh/2+0.01, sLam=(D-dh)/(fx.nLam-1);
   const schL=Math.round(A*1.414+18);
   const blokP=Math.max(120,duo+50);
@@ -715,7 +716,6 @@ function openTekening(){
   zl.push(['voorbalk (voorrand, vol breed)','5 × 20',B,1,`1× ${handelslengte(B)}`]);
   zl.push([opt.balk?'dakbalk':'lamel',opt.balk?'15 × 15':'4,5 × 7',B,fx.nLam,`${fx.nLam}× ${handelslengte(B+10)} (op smetlijn afzagen)`]);
   if(nS) zl.push(['kleine schoor (45°-koppen)','15 × 15',schL,nS,nS===2?`1× 300 (samen)`:`1× ${handelslengte(schL)}`]);
-  const nPan2=(opt.panZ?1:0)+(opt.panP?1:0);
   if(nPan2){ zl.push(['jaloezie-lat (panelen)','2,2 × 7',latL,nLat*nPan2,`spleet 3 · h.o.h. 10`]); zl.push(['paneel-regel','4,5 × 7',H-50,nPan2*2,'']); }
   if(opt.wandLat){ zl.push(['jaloezie-lat (achterwand)','2,2 × 7',B-75,nLat,'spleet 3 · h.o.h. 10 · 2 tussenregels']); zl.push(['wand-regel','4,5 × 7',H-50,2,'']); }
   if(opt.wandRol) zl.push(['buitenrolgordijn antraciet','op maat',B-75,1,'aan de koppelbalk · bij storm oprollen']);
