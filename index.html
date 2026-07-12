@@ -360,6 +360,7 @@ function draw(){
     dim(Pr(-40-eF,2,P.over), Pr(-40-eF,2,zV), `${P.duo}`);
     dim(Pr(-40-eF,2,0), Pr(-40-eF,2,P.over), `${P.over}`);
     dim(Pr(-75-eF,2,P.over), Pr(-75-eF,2,P.D), `${P.D-P.over} v.a. achterpaal`);
+    dim(Pr(37.5,2,-55), Pr(P.B-37.5,2,-55), `${P.B-75} vrij tussen de achterpalen`);
     dim(Pr(xr,0,P.D+35), Pr(xr,P.H+7,P.D+35), `±${P.H+7} hoog`);
   }
 }
@@ -395,6 +396,7 @@ function updUI(){
   const fx=fysica();
   const rows=[
     ['vrije zweef voor', fx.zweefCm+' cm'],
+    ['vrij tussen de achterpalen', (P.B-75)+' cm'],
     [opt.balk?'dakbalken 15×15':'lamellen 4,5×7', fx.nLam+' st'],
     ['hoogte totaal', '±'+(P.H+(opt.balk?15:7))+' cm'],
     ['hout totaal', '±'+fx.wHout+' kg'],
@@ -433,7 +435,8 @@ function updUI(){
   if(!opt.balk && ovV>150) m.push('⚠ lamel-overstek zweef-zijde '+Math.round(ovV)+' cm: te veel — breedte-voor terug of langsdrager toevoegen');
   if(opt.balk && ovV>120) m.push('⚠ overstek dakbalken '+Math.round(ovV)+' cm — breedte-voor terug');
   if(opt.massief) m.push('ℹ massieve liggers: verbinding wordt pen-gat op de paalkoppen + ingelijmd draadeind M16 op de trek-achterpaal (zie bouwbeschrijving)');
-  if(opt.wandRol) m.push('ℹ rolgordijn: aan de koppelbalk hangen, bij storm en afwezigheid altijd oprollen (het is een zeil)');
+  if(opt.wandRol && P.B-75>=252) m.push('ℹ rolgordijn Shadow Comfort 248 breed past: '+(P.B-75)+' cm vrij tussen de achterpalen ('+Math.round((P.B-75-248)/2)+' cm speling per kant) · bij storm oprollen');
+  if(opt.wandRol && P.B-75<252) m.push('⚠ standaard rolgordijn 248 past niet ('+(P.B-75)+' cm vrij) — op maat bestellen of breedte vergroten');
   if(opt.wandLat && opt.wandRol) m.push('⚠ kies latten óf rolgordijn voor de achterwand — beide tegelijk heeft geen zin');
   if(P.B-60>320) m.push('⚠ lamel-overspanning > 320: lamellen 4,5 × 9,5 nemen');
   if(fx.dbg>12) m.push('⚠ doorbuiging fors — schoor vergroten of diepte terug');
@@ -515,6 +518,7 @@ const BRONNEN=[
   ['7','hornbach.nl — SAKRETE snelbetonmortel 25 kg € 8,75 (1 zak ≈ 12,5 l); mortelbeton geleverd ≈ € 200/m³'],
   ['8','gadero.nl (Nesling-dealer) — harmonicadoek op maat ≈ € 22/m² · RVS-kabelset ≈ € 55'],
   ['9','wovar.nl — slotbouten M12, carrosserieringen, houtdraadbouten, RVS-schroeven'],
+  ['10','keessmit.nl — Shadow Comfort rolgordijn 248 × 240 cm, Cool Grey (HDPE, 90% windreductie, incl. montageset + draaistang) € 220'],
 ];
 
 function kosten(fx){
@@ -554,7 +558,10 @@ function kosten(fx){
     add('douglas regel 4,5×7 – 250 cm – zwart (wand-regels à 210)', 2,'st',stp(250,2.7),'3','gadero.nl (hoofdlevering)');
   }
   add('douglas regel 7×7 – 250 cm – zwart (→ karbelen à 75)', 1,'st',8,'3','gadero.nl (hoofdlevering)');
-  if(opt.wandRol) add('buitenrolgordijn op maat (±'+((P.B-75)/100).toFixed(1)+' × 2,1 m, antraciet)', 1,'st',150,'8','gadero.nl (hoofdlevering)');
+  if(opt.wandRol){
+    if(P.B-75>=252) add('Shadow Comfort rolgordijn 248 × 240 cm – Cool Grey, incl. montageset', 1,'st',220,'10','keessmit.nl');
+    else add('buitenrolgordijn op maat (±'+((P.B-75)/100).toFixed(1)+' × 2,1 m, antraciet)', 1,'st',150,'8','gadero.nl (hoofdlevering)');
+  }
   if(opt.poeren){
     const nDruk = opt.tui? nP : nP-1;
     if(opt.fundDruk==='antraciet'){
@@ -642,6 +649,7 @@ function openTekening(){
   if(opt.schoorP) b.push(`<line x1="${px(B-30)}" y1="${py(zV)}" x2="${px(B-30)}" y2="${py(zV+A)}" stroke="#8a6f4d" stroke-width="6" stroke-dasharray="8 5"/>`);
   b.push(dimH(px(-exF),px(B),py(D)-16,`${P.B2}${P.B2!==B?' voor (verbreding aan de zweef-zijde)':''}`));
   if(P.B2!==B) b.push(dimH(px(0),px(B),py(0)+38,`${B} achter`));
+  b.push(dimH(px(37.5),px(B-37.5),py(0)+56,`${B-75} vrij tussen de achterpalen`));
   b.push(dimH(px(30),px(B-30),py(D)-36,`${B-60} h.o.h. balklijnen`));
   b.push(dimV(py(D),py(zV),px(B)+18,`${zweef} zweef`));
   b.push(dimV(py(zV),py(zA),px(B)+18,`${duo}`));
