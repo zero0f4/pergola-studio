@@ -368,8 +368,9 @@ function updUI(){
   if(fx.zweefCm<50) m.push('⚠ vrijwel geen zweef meer — vergroot de diepte of verklein duo/oversteek');
   if(fx.trek>550) m.push('⚠ trek > 550 kg: buiten dit bout-recept — duo vergroten of diepte terug');
   if(fx.sigma>8) m.push('⚠ ligger te zwaar belast — sandwich naar 6,5 × 20 of schoor aanvinken/vergroten');
-  if(!opt.schoorZ && fx.zweefCm>230) m.push('⚠ zonder schoor is >230 zweef niet aan te raden — schoor aanvinken of diepte terug');
-  if(!opt.hoekpaal) m.push('⚠ zonder voorhoekpaal zweven béide zijden: óók daar een trekanker (trek geldt dan aan twee kanten) en vink beide schoren aan');
+  if(!opt.schoorZ && fx.zweefCm>230) m.push('⚠ zonder schoor is >230 zweef niet aan te raden — schoor zweef-zijde aanvinken of diepte terug');
+  if(!opt.hoekpaal && !opt.schoorP && fx.zweefCm>230) m.push('⚠ zonder voorhoekpaal zweeft ook de paal-zijde: boven 230 zweef daar een schoor aanvinken');
+  if(!opt.hoekpaal) m.push('ℹ zonder voorhoekpaal zweven béide zijden: voer óók onder de tweede achterpaal een trekanker uit (trek geldt aan twee kanten); schoren zijn pas nodig boven 230 zweef');
   if(opt.poeren && fx.capTrek/Math.max(fx.trekR,1) < 2) m.push('⚠ trekanker te licht ('+(fx.capTrek/Math.max(fx.trekR,1)).toFixed(1)+'×) — kies de gestorte trekpoer of breng de diepte terug');
   if(opt.poeren && opt.fundTrek==='b2') m.push('ℹ B2: draadeind moet dóór de poer (plaat + moer onder), niet op slappe grond');
   if(opt.balk && P.lam<50) m.push('⚠ 15×15-balken h.o.h. < 50 wordt erg zwaar en donker — 60 à 70 is gangbaar');
