@@ -98,6 +98,14 @@
   <div class="ctl"><label>dakbelasting <b id="vbel">25 kg/m²</b></label><input type="range" id="sbel" min="0" max="60" step="5" value="25"></div>
   <div class="sub" style="margin-top:0">0 droog · 25 wind op doek · 50 storm+sneeuw</div>
 
+  <h2>Configuraties</h2>
+  <div style="display:flex;gap:4px">
+    <select id="cfgSel" style="flex:1;font-size:.68rem;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)"></select>
+    <button id="bCfgLoad">laad</button>
+    <button id="bCfgDel" title="verwijderen">✕</button>
+  </div>
+  <button id="bCfgSave" style="width:100%;margin-top:4px;font-size:.7rem">💾 huidige configuratie opslaan</button>
+
   <h2>Uitkomsten</h2>
   <div id="uit"></div>
   <div id="melding"></div>
@@ -864,7 +872,19 @@ function openTekening(){
   .det{page-break-inside:avoid}
   @media (max-width:760px){.dets{grid-template-columns:1fr}}
   .btn{position:fixed;top:14px;right:14px;padding:.6rem 1rem;font:600 .85rem system-ui;cursor:pointer;border:1px solid #999;border-radius:8px;background:#fff}
-  @media print{.btn{display:none}.page{padding:0} h2{page-break-after:avoid} svg,table{page-break-inside:avoid}}
+  @page{ size:A4 portrait; margin:11mm }
+  @media print{
+    .btn{display:none}
+    .page{padding:0;max-width:none}
+    body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    h2.pb{page-break-before:always}
+    h2{page-break-after:avoid;margin-top:.3rem}
+    svg{page-break-inside:avoid;max-height:23cm}
+    table{page-break-inside:auto}
+    thead{display:table-header-group}
+    tr{page-break-inside:avoid}
+    .det,.kader{page-break-inside:avoid}
+  }
 </style></head><body>
 <button class="btn" onclick="window.print()">🖨 afdrukken / bewaar als PDF</button>
 <div class="page">
@@ -876,20 +896,20 @@ function openTekening(){
   <h2>1 · Bovenaanzicht (voorzijde boven)</h2>
   ${bovenSvg}
 
-  <h2>2 · Zijaanzicht zweef-duo (van voren gezien rechts) — voorzijde links</h2>
+  <h2 class="pb">2 · Zijaanzicht zweef-duo (van voren gezien rechts) — voorzijde links</h2>
   ${zijSvg}
   <div class="kader">Paal-zijde: identiek duo; de voorhoekpaal staat op <b>${zH-zV} cm vóór het duo-voorpaal-hart</b> (= ${terug} achter de voorrand). ${fundTxt} Bovenkant beton 5 cm boven maaiveld, afgesmeerd op afschot; 2 weken uitharden vóór het dak erop gaat.</div>
 
-  <h2>3 · Verbindingsdetails — hier zit het vakwerk</h2>
+  <h2 class="pb">3 · Verbindingsdetails — hier zit het vakwerk</h2>
   <div class="dets">${detHtml}</div>
 
-  <h2>4 · Zaaglijst</h2>
+  <h2 class="pb">4 · Zaaglijst</h2>
   <table><thead><tr><th>onderdeel</th><th>doorsnede (cm)</th><th>lengte (cm)</th><th>aantal</th><th>uit handelslengte / opmerking</th></tr></thead><tbody>${zlHtml}</tbody></table>
 
-  <h2>5 · Bevestiging &amp; ankers</h2>
+  <h2 class="pb">5 · Bevestiging &amp; ankers</h2>
   <table><thead><tr><th>artikel</th><th>aantal</th><th>toepassing</th></tr></thead><tbody>${boHtml}</tbody></table>
 
-  <h2>6 · Uitvoeringsnotities (kritiek)</h2>
+  <h2 class="pb">6 · Uitvoeringsnotities (kritiek)</h2>
   <div class="kader">
   1. Ankers exact stellen: duo-rechthoek ${B-60} × ${duo}, diagonalen gelijk${opt.hoekpaal?`; voorhoekpaal op ${zH-zV} vóór het voorpaal-hart, in de balklijn`:''}. Dit is het enige onherstelbare moment.<br>
   2. Boutgaten exact ø13 (niet ruimer). Trek-boutgroep achterpaal zweef-zijde: 3× M12 in driehoek met carrosserieringen.<br>
@@ -898,7 +918,7 @@ function openTekening(){
   5. Dakhout: beide liggers afschrijven, monteren, koppen langs smetlijn in één keer op 30 overstek afzagen.<br>
   6. Niets ophangen aan de zwevende voorrand (schommel/hangmat). Doek bij storm altijd opgevouwen, 's winters binnen.
   </div>
-  <h2>7 · Bestellijst &amp; kosten (incl. btw)</h2>
+  <h2 class="pb">7 · Bestellijst &amp; kosten (incl. btw)</h2>
   <table><thead><tr><th>onderdeel</th><th>hoeveelheid</th><th>prijs p.e.</th><th>totaal</th><th>bestellen bij</th><th>bron</th></tr></thead><tbody>${kHtml}</tbody></table>
   <div class="kader"><b>Bronnen</b> (online geraadpleegd 12-07-2026):<ol style="margin:.3rem 0 .3rem 1.1rem;padding:0">${brHtml}</ol>
   Richtprijzen ±10%, exclusief bezorging en gereedschap. Tip: bestel al het hout in één keer bij één handel (bijv. houtgemak.nl of een lokale houthandel) — dat scheelt bezorgkosten en vaak 10–15% op de bouwpakket-prijs. Zwart gedompeld af fabriek is ±15–20% duurder dan blank; zelf 2× zwart beitsen kost ±€ 60 aan beits en een dag werk.</div>
@@ -917,6 +937,39 @@ function openTekening(){
   }
 }
 document.getElementById('bSave').onclick=openTekening;
+
+/* ---------- configuraties opslaan/laden (localStorage) ---------- */
+const CFGKEY='pergola.cfg.v1';
+const SLIDERS=[['sB','B'],['sB2','B2'],['szs','zs'],['sD','D'],['sduo','duo'],['sover','over'],['sH','H'],['slam','lam'],['sterug','terug'],['sA','A'],['sdz','dz'],['sbel','bel']];
+const CHKS=[['cSZ','schoorZ'],['cSP','schoorP'],['cPanZ','panZ'],['cPanP','panP'],['cWand','wandLat'],['cRol','wandRol'],['cHoek','hoekpaal'],['cDoek','doek'],['cBalk','balk'],['cMas','massief'],['cTui','tui'],['cDwars','dwars']];
+function cfgAll(){ try{ return JSON.parse(localStorage.getItem(CFGKEY)||'{}'); }catch(e){ return {}; } }
+function cfgRefresh(sel){
+  const s=document.getElementById('cfgSel'), all=cfgAll(), keys=Object.keys(all);
+  s.innerHTML = keys.length? keys.map(k=>`<option${k===sel?' selected':''}>${k}</option>`).join('') : '<option disabled selected>— nog geen opgeslagen —</option>';
+}
+function syncUI(){
+  for(const [id,key] of SLIDERS){ const el=document.getElementById(id); el.value=P[key]; document.getElementById('v'+id.slice(1)).textContent=P[key]+(key==='bel'?' kg/m²':''); }
+  for(const [id,key] of CHKS) document.getElementById(id).checked=!!opt[key];
+  for(const el of document.querySelectorAll('input[name=fd]')) el.checked=(el.value===opt.fundDruk);
+  for(const el of document.querySelectorAll('input[name=ft]')) el.checked=(el.value===opt.fundTrek);
+}
+document.getElementById('bCfgSave').onclick=()=>{
+  const nm=prompt('Naam voor deze configuratie:', document.getElementById('cfgSel').value||'mijn pergola');
+  if(!nm) return;
+  const all=cfgAll(); all[nm]={P:{...P}, opt:{...opt}};
+  localStorage.setItem(CFGKEY, JSON.stringify(all)); cfgRefresh(nm);
+};
+document.getElementById('bCfgLoad').onclick=()=>{
+  const c=cfgAll()[document.getElementById('cfgSel').value]; if(!c) return;
+  Object.assign(P,c.P); Object.assign(opt,c.opt); opt.poeren = opt.fundDruk!=='blok';
+  syncUI(); buildModel(); updUI(); draw();
+};
+document.getElementById('bCfgDel').onclick=()=>{
+  const nm=document.getElementById('cfgSel').value, all=cfgAll();
+  if(!all[nm] || !confirm('"'+nm+'" verwijderen?')) return;
+  delete all[nm]; localStorage.setItem(CFGKEY, JSON.stringify(all)); cfgRefresh();
+};
+cfgRefresh();
 
 buildModel(); updUI(); draw(); tick();
 </script>
