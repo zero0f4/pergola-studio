@@ -56,7 +56,9 @@
   <div class="sub">zwevend · zwart douglas · wip-principe</div>
 
   <h2>Maten (cm)</h2>
-  <div class="ctl"><label>breedte dak <b id="vB">365</b></label><input type="range" id="sB" min="300" max="450" step="5" value="365"></div>
+  <div class="ctl"><label>breedte achter <b id="vB">365</b></label><input type="range" id="sB" min="300" max="450" step="5" value="365"></div>
+  <div class="ctl"><label>breedte voor <b id="vB2">365</b></label><input type="range" id="sB2" min="300" max="520" step="5" value="365"></div>
+  <div class="ctl"><label>verbreding vanaf achter <b id="vzs">200</b></label><input type="range" id="szs" min="100" max="300" step="10" value="200"></div>
   <div class="ctl"><label>diepte dak <b id="vD">320</b></label><input type="range" id="sD" min="250" max="500" step="5" value="320"></div>
   <div class="ctl"><label>duo-afstand (h.o.h.) <b id="vduo">90</b></label><input type="range" id="sduo" min="60" max="150" step="5" value="90"></div>
   <div class="ctl"><label>oversteek achter <b id="vover">30</b></label><input type="range" id="sover" min="20" max="60" step="5" value="30"></div>
@@ -120,7 +122,9 @@ const cv = document.getElementById('c');
 const ctx = cv.getContext('2d');
 
 /* ---------- parameters ---------- */
-const P = { B:365, D:320, duo:90, over:30, H:260, lam:35, terug:35, A:90, bel:25 };
+const P = { B:365, B2:365, zs:200, D:320, duo:90, over:30, H:260, lam:35, terug:35, A:90, bel:25 };
+// lamel-lengte op diepte z (vanaf achter): tot P.zs de achterbreedte, daarna lineair uitwaaierend naar P.B2
+function lamLen(cz){ const zs=Math.min(P.zs,P.D-10); return cz<=zs? P.B : P.B + (P.B2-P.B)*(cz-zs)/(P.D-zs); }
 const opt = { schoorZ:true, schoorP:true, panZ:true, panP:true, wandLat:false, wandRol:false, hoekpaal:true, doek:true, massief:false, balk:false, poeren:true, tui:false, fundDruk:'basic', fundTrek:'tegel' };
 let doekDicht=false, showK=true, showM=true;
 
@@ -147,12 +151,15 @@ function fysica(){
   const zweefCm = P.D - P.duo - P.over;
   const a = zweefCm/100, c = duo+over;
   const nLam = Math.max(2, Math.round((P.D-(opt.balk?15:5))/P.lam)+1);
+  // gemiddelde dakbreedte (uitwaaierend deel meegewogen)
+  const zsM=Math.min(P.zs,P.D-10)/100, B2=P.B2/100;
+  const Bavg = (B*zsM + (B+B2)/2*(D-zsM))/D;
   // eigen gewicht (douglas 550 kg/m³)
-  const wLam = nLam*B*(opt.balk?12.4:1.73), wLig = (opt.massief?2*12.4:4*5.5)*D, wBalk = 2*(B-0.6)*5.5, wSch = 31;
+  const wLam = nLam*Bavg*(opt.balk?12.4:1.73), wLig = (opt.massief?2*12.4:4*5.5)*D, wBalk = (B-0.6)*5.5 + (B2-0.6)*5.5, wSch = 31;
   const wDak = wLam+wLig+wBalk+wSch;
   const wPalen = 5*(P.H/100)*12.4;
   const w = wDak/2/D;                        // eigen dak per zijde per m
-  const q = w + P.bel*(B/2);                 // kg/m per zijde
+  const q = w + P.bel*(Bavg/2);              // kg/m per zijde
   // tuikabels: kabel van verhoogde achterpaal (+100) naar de ligger-kop tilt de voorrand
   const Rtui = opt.tui? 0.4*q*a : 0;
   const hyp = Math.hypot(100, P.D-P.over);
@@ -161,7 +168,7 @@ function fysica(){
   const trek = Math.round(M/duo/5)*5;
   const druk = Math.round((q*D + M/duo + 35 + Rtui)/5)*5;
   // rekenwaarde-trek (altijd bij 50 kg/m², onafhankelijk van de schuif) — hierop wordt de fundering gedimensioneerd
-  const q50 = w + 50*(B/2);
+  const q50 = w + 50*(Bavg/2);
   const R50 = opt.tui? 0.4*q50*a : 0;
   const trekR = Math.round(Math.max(0, q50*(a*a - c*c)/2 - R50*a)/duo/5)*5;
   const kabelT50 = opt.tui? Math.round(R50*hyp/100/5)*5 : 0;
@@ -233,15 +240,16 @@ function buildModel(){
   if(opt.massief){ for(const bx of [xZ-7.5,xP-7.5]) addBox(bx,H-20,0, bx+15,H,D, WOOD); }
   else { for(const bx of [xZ-12.5,xZ+7.5,xP-12.5,xP+7.5]) addBox(bx,H-20,0, bx+5,H,D, WOOD); }
   // koppelbalk (achterrand) en voorbalk (voorrand) — doorlopend over de volle dakbreedte
+  const eF=(P.B2-P.B)/2;
   addBox(0,H-20,-5, B,H,0, WOOD);
-  addBox(0,H-20,D, B,H,D+5, WOOD);
+  addBox(-eF,H-20,D, B+eF,H,D+5, WOOD);
   // kleine schoren per zijde (vinkjes)
   if(opt.schoorZ) addKarbeel(xZ, zV+7.5, A, H);
   if(opt.schoorP) addKarbeel(xP, zV+7.5, A, H);
-  // dakhout: lamellen 4,5×7 op hun kant óf balken 15×15
+  // dakhout: lamellen 4,5×7 op hun kant óf balken 15×15 — lengte waaiert uit naar voren
   const dh = opt.balk? 7.5 : 2.25, dhH = opt.balk? 15 : 7;
   const n=fx.nLam, s=(D-2*dh)/(n-1);
-  for(let i=0;i<n;i++){ const cz=dh+i*s; addBox(0,H,cz-dh, B,H+dhH,cz+dh, WOOD2); }
+  for(let i=0;i<n;i++){ const cz=dh+i*s, L=lamLen(cz), e=(L-B)/2; addBox(-e,H,cz-dh, B+e,H+dhH,cz+dh, WOOD2); }
   // jaloezie-panelen in de duo-vakken (per zijde) + achterwand (latten of rolgordijn)
   for(let y=30; y+7<=H-22; y+=10){
     if(opt.panZ) addBox(xZ-1.1,y,zA+7.5, xZ+1.1,y+7,zV-7.5, LAT);
@@ -328,14 +336,15 @@ function draw(){
   }
   // maatlijnen
   if(showM){
-    const zV=P.over+P.duo, zw=P.D-zV;
-    dim(Pr(0,2,P.D+35), Pr(P.B,2,P.D+35), `${P.B}`);                       // breedte, vóór
-    dim(Pr(P.B+40,2,0), Pr(P.B+40,2,P.D), `${P.D}`);                       // diepte, paal-zijde
-    dim(Pr(-40,2,zV), Pr(-40,2,P.D), `${zw} zweef`);                        // vrije zweef, zweef-zijde
-    dim(Pr(-40,2,P.over), Pr(-40,2,zV), `${P.duo}`);                        // duo
-    dim(Pr(-40,2,0), Pr(-40,2,P.over), `${P.over}`);                        // oversteek achter
-    dim(Pr(-75,2,P.over), Pr(-75,2,P.D), `${P.D-P.over} v.a. achterpaal`);  // tweede paal → voorrand
-    dim(Pr(P.B+40,0,P.D+35), Pr(P.B+40,P.H+7,P.D+35), `±${P.H+7} hoog`);   // hoogte, voorhoek
+    const zV=P.over+P.duo, zw=P.D-zV, eF=(P.B2-P.B)/2, xr=P.B+Math.max(0,eF)+40;
+    dim(Pr(-eF,2,P.D+35), Pr(P.B+eF,2,P.D+35), `${P.B2}${P.B2!==P.B?' voor':''}`);   // breedte vóór
+    if(P.B2!==P.B) dim(Pr(0,2,-28), Pr(P.B,2,-28), `${P.B} achter`);                  // breedte achter
+    dim(Pr(xr,2,0), Pr(xr,2,P.D), `${P.D}`);                                          // diepte
+    dim(Pr(-40-Math.max(0,eF),2,zV), Pr(-40-Math.max(0,eF),2,P.D), `${zw} zweef`);
+    dim(Pr(-40-Math.max(0,eF),2,P.over), Pr(-40-Math.max(0,eF),2,zV), `${P.duo}`);
+    dim(Pr(-40-Math.max(0,eF),2,0), Pr(-40-Math.max(0,eF),2,P.over), `${P.over}`);
+    dim(Pr(-75-Math.max(0,eF),2,P.over), Pr(-75-Math.max(0,eF),2,P.D), `${P.D-P.over} v.a. achterpaal`);
+    dim(Pr(xr,0,P.D+35), Pr(xr,P.H+7,P.D+35), `±${P.H+7} hoog`);
   }
 }
 function poly(pts){ ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.closePath(); ctx.fill(); }
@@ -403,6 +412,9 @@ function updUI(){
   if(opt.poeren && opt.fundTrek==='b2') m.push('ℹ B2: draadeind moet dóór de poer (plaat + moer onder), niet op slappe grond');
   if(opt.balk && P.lam<50) m.push('⚠ 15×15-balken h.o.h. < 50 wordt erg zwaar en donker — 60 à 70 is gangbaar');
   if(!opt.balk && P.lam>50) m.push('⚠ lamellen h.o.h. > 50 oogt schraal — of kies 15×15-balken');
+  const ovV=(P.B2-(P.B-60))/2;
+  if(!opt.balk && ovV>90) m.push('⚠ voor-overstek lamellen '+Math.round(ovV)+' cm (> 90) — lamellen 4,5×9,5 nemen of breedte-voor terug');
+  if(opt.balk && ovV>120) m.push('⚠ voor-overstek dakbalken '+Math.round(ovV)+' cm — breedte-voor terug');
   if(opt.massief) m.push('ℹ massieve liggers: verbinding wordt pen-gat op de paalkoppen + ingelijmd draadeind M16 op de trek-achterpaal (zie bouwbeschrijving)');
   if(opt.wandRol) m.push('ℹ rolgordijn: aan de koppelbalk hangen, bij storm en afwezigheid altijd oprollen (het is een zeil)');
   if(opt.wandLat && opt.wandRol) m.push('⚠ kies latten óf rolgordijn voor de achterwand — beide tegelijk heeft geen zin');
@@ -417,7 +429,8 @@ function bindSlider(id, key, label, suffix){
   P[key]=+el.value; document.getElementById(label).textContent=el.value+(suffix||'');   // sync met evt. door de browser herstelde stand
   el.oninput=()=>{ P[key]=+el.value; document.getElementById(label).textContent=el.value+(suffix||''); buildModel(); updUI(); draw(); };
 }
-bindSlider('sB','B','vB'); bindSlider('sD','D','vD'); bindSlider('sduo','duo','vduo');
+bindSlider('sB','B','vB'); bindSlider('sB2','B2','vB2'); bindSlider('szs','zs','vzs');
+bindSlider('sD','D','vD'); bindSlider('sduo','duo','vduo');
 bindSlider('sover','over','vover'); bindSlider('sH','H','vH'); bindSlider('slam','lam','vlam');
 bindSlider('sterug','terug','vterug'); bindSlider('sA','A','vA'); bindSlider('sbel','bel','vbel',' kg/m²');
 
@@ -499,9 +512,11 @@ function kosten(fx){
   if(nS) add('kleine schoren 15×15 zwart (uit 1× 300)', 3,'m¹',20.0,'1','vanviegen.com');
   if(opt.massief) add('liggers massief 15×15 zwart', 2*handelslengte(P.D)/100,'m¹',20.0,'1','vanviegen.com');
   else add('sandwich-balken 5×20 zwart', 4*handelslengte(P.D)/100,'m¹',8.5,'2','houtgemak.nl');
-  add('koppel- + voorbalk 5×20 zwart', 2*handelslengte(P.B)/100,'m¹',8.5,'2','houtgemak.nl');
-  if(opt.balk) add('dakbalken 15×15 zwart', fx.nLam*handelslengte(P.B+10)/100,'m¹',20.0,'1','vanviegen.com');
-  else add('lamellen 4,5×7 zwart', fx.nLam*handelslengte(P.B+10)/100,'m¹',2.7,'3','houtgemak.nl');
+  add('koppelbalk 5×20 zwart (achter)', handelslengte(P.B)/100,'m¹',8.5,'2','houtgemak.nl');
+  add('voorbalk 5×20 zwart', handelslengte(P.B2)/100,'m¹',8.5,'2','houtgemak.nl');
+  const maxB=Math.max(P.B,P.B2);
+  if(opt.balk) add('dakbalken 15×15 zwart', fx.nLam*handelslengte(maxB+10)/100,'m¹',20.0,'1','vanviegen.com');
+  else add('lamellen 4,5×7 zwart', fx.nLam*handelslengte(maxB+10)/100,'m¹',2.7,'3','houtgemak.nl');
   const nPan=(opt.panZ?1:0)+(opt.panP?1:0);
   if(nPan){ add('jaloezie-latten 2,2×7 zwart (panelen)', Math.round(nLat*nPan*latL/100),'m¹',1.9,'4','houtgemak.nl'); add('paneel-regels 4,5×7 zwart', nPan*2*(P.H-50)/100,'m¹',2.7,'3','houtgemak.nl'); }
   if(opt.wandLat){ add('jaloezie-latten 2,2×7 zwart (achterwand)', Math.round(nLat*(P.B-75)/100),'m¹',1.9,'4','houtgemak.nl'); add('wand-regels 4,5×7 zwart', 2*(P.H-50)/100,'m¹',2.7,'3','houtgemak.nl'); }
@@ -571,26 +586,28 @@ function openTekening(){
 
   /* — BOVENAANZICHT — */
   let s=1.45, M=80;
-  const px=x=>M+x*s, py=z=>M+(D-z)*s;
-  const bw=M*2+B*s+60, bh=M*2+D*s;
+  const exF=(P.B2-B)/2, ex0=Math.max(0,exF), zsC=Math.min(P.zs,D-10);
+  const px=x=>M+(x+ex0)*s, py=z=>M+(D-z)*s;
+  const bw=M*2+Math.max(B,P.B2)*s+60, bh=M*2+D*s;
   let b=[];
-  b.push(`<rect x="${px(0)}" y="${py(D)}" width="${B*s}" height="${D*s}" fill="none" stroke="#999" stroke-dasharray="6 4"/>`);
-  for(let i=0;i<fx.nLam;i++){ const cz=dhOff+i*sLam; b.push(`<rect x="${px(0)}" y="${py(cz)-dh*s/2}" width="${B*s}" height="${dh*s}" fill="#3a3835" opacity=".85"/>`); }
+  b.push(`<polygon points="${px(0)},${py(0)} ${px(B)},${py(0)} ${px(B)},${py(zsC)} ${px(B+exF)},${py(D)} ${px(-exF)},${py(D)} ${px(0)},${py(zsC)}" fill="none" stroke="#999" stroke-dasharray="6 4"/>`);
+  for(let i=0;i<fx.nLam;i++){ const cz=dhOff+i*sLam, L=lamLen(cz), e=(L-B)/2; b.push(`<rect x="${px(-e)}" y="${py(cz)-dh*s/2}" width="${L*s}" height="${dh*s}" fill="#3a3835" opacity=".85"/>`); }
   const ligs = opt.massief? [[30-7.5,15],[B-30-7.5,15]] : [[30-12.5,5],[30+7.5,5],[B-30-12.5,5],[B-30+7.5,5]];
   for(const [lx,lw] of ligs) b.push(`<rect x="${px(lx)}" y="${py(D)}" width="${lw*s}" height="${D*s}" fill="#111"/>`);
-  b.push(`<rect x="${px(0)}" y="${py(D)-5*s}" width="${B*s}" height="${5*s}" fill="#111"/>`);
+  b.push(`<rect x="${px(-exF)}" y="${py(D)-5*s}" width="${P.B2*s}" height="${5*s}" fill="#111"/>`);
   b.push(`<rect x="${px(0)}" y="${py(0)}" width="${B*s}" height="${5*s}" fill="#111"/>`);
   const posts=[[30,zA],[30,zV],[B-30,zA],[B-30,zV]]; if(opt.hoekpaal) posts.push([B-30,zH]);
   for(const [X,Z] of posts) b.push(`<rect x="${px(X-7.5)}" y="${py(Z+7.5)}" width="${15*s}" height="${15*s}" fill="#000"/>`);
   if(opt.paneel){ b.push(`<rect x="${px(30-1.5)}" y="${py(zV-7.5)}" width="${3*s}" height="${(duo-15)*s}" fill="#8a6f4d"/>`); b.push(`<rect x="${px(B-30-1.5)}" y="${py(zV-7.5)}" width="${3*s}" height="${(duo-15)*s}" fill="#8a6f4d"/>`); }
   if(opt.schoorZ) b.push(`<line x1="${px(30)}" y1="${py(zV)}" x2="${px(30)}" y2="${py(zV+A)}" stroke="#8a6f4d" stroke-width="6" stroke-dasharray="8 5"/>`);
   if(opt.schoorP) b.push(`<line x1="${px(B-30)}" y1="${py(zV)}" x2="${px(B-30)}" y2="${py(zV+A)}" stroke="#8a6f4d" stroke-width="6" stroke-dasharray="8 5"/>`);
-  b.push(dimH(px(0),px(B),py(D)-16,`${B}`));
+  b.push(dimH(px(-exF),px(B+exF),py(D)-16,`${P.B2}${P.B2!==B?' voor':''}`));
+  if(P.B2!==B) b.push(dimH(px(0),px(B),py(0)+38,`${B} achter`));
   b.push(dimH(px(30),px(B-30),py(D)-36,`${B-60} h.o.h. balklijnen`));
-  b.push(dimV(py(D),py(zV),px(B)+18,`${zweef} zweef`));
-  b.push(dimV(py(zV),py(zA),px(B)+18,`${duo}`));
-  b.push(dimV(py(zA),py(0),px(B)+18,`${over}`));
-  b.push(dimV(py(D),py(0),px(B)+44,`${D} totaal`));
+  b.push(dimV(py(D),py(zV),px(B+ex0)+18,`${zweef} zweef`));
+  b.push(dimV(py(zV),py(zA),px(B+ex0)+18,`${duo}`));
+  b.push(dimV(py(zA),py(0),px(B+ex0)+18,`${over}`));
+  b.push(dimV(py(D),py(0),px(B+ex0)+44,`${D} totaal`));
   if(opt.hoekpaal) b.push(dimV(py(D),py(zH),px(B-60)-14,`${terug}`));
   b.push(`<text class="dt" x="${px(B/2)}" y="${py(0)+22}">dakhout ${opt.balk?'15×15':'4,5×7 op kant'} · ${fx.nLam} st · h.o.h. ±${Math.round(sLam)} · overstek 30 per zijde</text>`);
   b.push(`<text class="dt" x="${px(B/2)}" y="${py(D)-56}">VOORZIJDE — van hieruit gezien: paal-zijde links, zweef-zijde rechts</text>`);
@@ -751,8 +768,9 @@ function openTekening(){
   if(opt.massief) zl.push(['ligger massief','15 × 15',D,2,`2× ${handelslengte(D)}`]);
   else zl.push(['sandwich-balk','5 × 20',D,4,`4× ${handelslengte(D)}`]);
   zl.push(['koppelbalk (achterrand, vol breed)','5 × 20',B,1,`1× ${handelslengte(B)}`]);
-  zl.push(['voorbalk (voorrand, vol breed)','5 × 20',B,1,`1× ${handelslengte(B)}`]);
-  zl.push([opt.balk?'dakbalk':'lamel',opt.balk?'15 × 15':'4,5 × 7',B,fx.nLam,`${fx.nLam}× ${handelslengte(B+10)} (op smetlijn afzagen)`]);
+  zl.push(['voorbalk (voorrand, vol breed)','5 × 20',P.B2,1,`1× ${handelslengte(P.B2)}`]);
+  const lamLbl = P.B2===B? `${B}` : `${Math.min(B,P.B2)}–${Math.max(B,P.B2)} (uitwaaierend v.a. ${Math.min(P.zs,D-10)})`;
+  zl.push([opt.balk?'dakbalk':'lamel',opt.balk?'15 × 15':'4,5 × 7',lamLbl,fx.nLam,`${fx.nLam}× ${handelslengte(Math.max(B,P.B2)+10)} (op smetlijn afzagen)`]);
   if(nS) zl.push(['kleine schoor (45°-koppen)','15 × 15',schL,nS,nS===2?`1× 300 (samen)`:`1× ${handelslengte(schL)}`]);
   if(nPan2){ zl.push(['jaloezie-lat (panelen)','2,2 × 7',latL,nLat*nPan2,`spleet 3 · h.o.h. 10`]); zl.push(['paneel-regel','4,5 × 7',H-50,nPan2*2,'']); }
   if(opt.wandLat){ zl.push(['jaloezie-lat (achterwand)','2,2 × 7',B-75,nLat,'spleet 3 · h.o.h. 10 · 2 tussenregels']); zl.push(['wand-regel','4,5 × 7',H-50,2,'']); }
