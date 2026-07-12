@@ -273,9 +273,9 @@ function buildModel(){
     if(opt.wandLat) addBox(xZ+7.5,y,zA-1.1, xP-7.5,y+7,zA+1.1, LAT);
   }
   if(opt.wandRol){
-    addBox(xZ+7.5,H-30,zA-11.5, xP-7.5,H-21,zA-3.5, WOOD);            // cassette/buis onder de koppelbalk
-    addBox(xZ+12,95,zA-8, xP-12,H-30,zA-6.5, DOEK);                   // doek half afgerold
-    addBox(xZ+12,92,zA-9, xP-12,95,zA-5.5, WOOD);                     // onderlat
+    addBox(xZ-8,H-30,zA-16, xP+8,H-21,zA-8, WOOD);                    // cassette 296 óp de koppelbalk (overlapt de palen)
+    addBox(xZ-4,95,zA-13, xP+4,H-30,zA-11.5, DOEK);                   // doek half afgerold, vóór de palen langs
+    addBox(xZ-4,92,zA-14, xP+4,95,zA-10.5, WOOD);                     // onderlat met D-ringen
   }
   // doek (vinkje + open/dicht-knop)
   if(!opt.doek){ /* geen doek */ }
@@ -442,8 +442,8 @@ function updUI(){
   if(!opt.balk && ovV>150) m.push('⚠ lamel-overstek zweef-zijde '+Math.round(ovV)+' cm: te veel — breedte-voor terug of langsdrager toevoegen');
   if(opt.balk && ovV>120) m.push('⚠ overstek dakbalken '+Math.round(ovV)+' cm — breedte-voor terug');
   if(opt.massief) m.push('ℹ massieve liggers: verbinding wordt pen-gat op de paalkoppen + ingelijmd draadeind M16 op de trek-achterpaal (zie bouwbeschrijving)');
-  if(opt.wandRol && P.B-75>=252) m.push('ℹ rolgordijn Shadow Comfort 248 breed past: '+(P.B-75)+' cm vrij tussen de achterpalen ('+Math.round((P.B-75-248)/2)+' cm speling per kant) · bij storm oprollen');
-  if(opt.wandRol && P.B-75<252) m.push('⚠ standaard rolgordijn 248 past niet ('+(P.B-75)+' cm vrij) — op maat bestellen of breedte vergroten');
+  if(opt.wandRol && P.B-75>=300) m.push('ℹ rolgordijn 296 (standaardmaat) past tussen de palen: '+(P.B-75)+' cm vrij · bij storm oprollen');
+  if(opt.wandRol && P.B-75<300) m.push('ℹ rolgordijn 296 (standaardmaat) monteer je óp de achterzijde van de koppelbalk — hij overlapt de palen (opening '+(P.B-75)+' cm binnenwerks, dus geen kieren); onderlat met D-ringen aan de dwarsbalk · bij storm oprollen');
   if(opt.wandLat && opt.wandRol) m.push('⚠ kies latten óf rolgordijn voor de achterwand — beide tegelijk heeft geen zin');
   if(P.B-60>320) m.push('⚠ lamel-overspanning > 320: lamellen 4,5 × 9,5 nemen');
   if(fx.dbg>12) m.push('⚠ doorbuiging fors — schoor vergroten of diepte terug');
@@ -525,7 +525,7 @@ const BRONNEN=[
   ['7','hornbach.nl — SAKRETE snelbetonmortel 25 kg € 8,75 (1 zak ≈ 12,5 l); mortelbeton geleverd ≈ € 200/m³'],
   ['8','gadero.nl (Nesling-dealer) — harmonicadoek op maat ≈ € 22/m² · RVS-kabelset ≈ € 55'],
   ['9','wovar.nl — slotbouten M12, carrosserieringen, houtdraadbouten, RVS-schroeven'],
-  ['10','keessmit.nl — Shadow Comfort rolgordijn 248 × 240 cm, Cool Grey (HDPE, 90% windreductie, incl. montageset + draaistang) € 220'],
+  ['10','keessmit.nl — Shadow Comfort rolgordijn Cool Grey (HDPE, 90% windreductie, incl. montageset + draaistang): 248 × 240 € 220 · 296 × 240 ± € 245 (standaardbreedtes; 296 overlapt de 290-opening bij montage op de koppelbalk)'],
 ];
 
 function kosten(fx){
@@ -566,8 +566,8 @@ function kosten(fx){
   }
   add('douglas regel 7×7 – 250 cm – zwart (→ karbelen à 75)', 1,'st',8,'3','gadero.nl (hoofdlevering)');
   if(opt.wandRol){
-    if(P.B-75>=252) add('Shadow Comfort rolgordijn 248 × 240 cm – Cool Grey, incl. montageset', 1,'st',220,'10','keessmit.nl');
-    else add('buitenrolgordijn op maat (±'+((P.B-75)/100).toFixed(1)+' × 2,1 m, antraciet)', 1,'st',150,'8','gadero.nl (hoofdlevering)');
+    if(P.B-75>=300) add('Shadow Comfort rolgordijn 296 × 240 cm – Cool Grey (tussen de palen)', 1,'st',245,'10','keessmit.nl');
+    else add('Shadow Comfort rolgordijn 296 × 240 cm – Cool Grey (óp de koppelbalk, overlapt de palen)', 1,'st',245,'10','keessmit.nl');
   }
   if(opt.poeren){
     const nDruk = opt.tui? nP : nP-1;
