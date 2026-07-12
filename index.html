@@ -375,11 +375,14 @@ function updUI(){
     ['hout totaal', '±'+fx.wHout+' kg'],
     ['trek achterpaal', '±'+fx.trek+' kg'],
     ['druk voorpaal', '±'+fx.druk+' kg'],
-    ...(opt.poeren? [
+    ...(opt.poeren? (opt.tui? [
+      ['trekanker', 'niet nodig — kabels dragen'],
+      ['alle palen', opt.fundDruk==='antraciet'?'gadero antraciet 14×14':'prefab poer 30×30'],
+    ] : [
       ['trekanker', fx.capLbl+' ≈ '+fx.capTrek+' kg'],
       ['veiligheid trekanker', (fx.capTrek/Math.max(fx.trekR,1)).toFixed(1)+'×'],
       ['drukpalen', opt.fundDruk==='antraciet'?'gadero antraciet 14×14':'prefab poer 30×30'],
-    ] : [
+    ]) : [
       ['blok zweef-zijde', fx.blokL+'×50×70 ≈ '+fx.blokKg+' kg'],
       ['veiligheid blok', fx.veilig>=99?'—':fx.veilig.toFixed(1)+'×'],
     ]),
@@ -504,13 +507,15 @@ function kosten(fx){
   if(opt.wandLat){ add('jaloezie-latten 2,2×7 zwart (achterwand)', Math.round(nLat*(P.B-75)/100),'m¹',1.9,'4','houtgemak.nl'); add('wand-regels 4,5×7 zwart', 2*(P.H-50)/100,'m¹',2.7,'3','houtgemak.nl'); }
   if(opt.wandRol) add('buitenrolgordijn op maat (±'+((P.B-75)/100).toFixed(1)+' × 2,1 m, antraciet)', 1,'st',150,'8','gadero.nl / jysk.nl');
   if(opt.poeren){
+    const nDruk = opt.tui? nP : nP-1;
     if(opt.fundDruk==='antraciet'){
-      add('betonpoer antraciet 14×14×50 met 28×28-voet (drukpalen)', nP-1,'st',65.95,'6','gadero.nl');
-      add('hoogteverstelplaten M16', nP-1,'st',9,'6','gadero.nl');
+      add('betonpoer antraciet 14×14×50 met 28×28-voet', nDruk,'st',65.95,'6','gadero.nl');
+      add('hoogteverstelplaten M16', nDruk,'st',9,'6','gadero.nl');
     } else {
-      add('prefab betonpoeren 30×30 incl. plaatdrager (drukpalen)', nP-1,'st',25,'6','betondingen.nl');
+      add('prefab betonpoeren 30×30 incl. plaatdrager', nDruk,'st',25,'6','betondingen.nl');
     }
-    if(opt.fundTrek==='tegel'){
+    if(opt.tui){ /* geen trekanker nodig — de kabels dragen */ }
+    else if(opt.fundTrek==='tegel'){
       add('poer met doorlopend gat (trekpositie)', 1,'st',25,'6','betondingen.nl');
       add('betontegels 60×60 (tegelanker)', 2,'st',6,'7','hornbach.nl');
       add('draadeind M16 × 100 vz + schotelplaten/moeren', 1,'set',15,'9','wovar.nl');
