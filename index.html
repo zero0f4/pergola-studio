@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Pergola Studio — zwevende pergola</title>
+<style>
+  /* altijd licht: de pergola is zwart, de omgeving blijft licht */
+  :root {
+    --bg1: #e8ecef; --bg2: #faf8f2; --ink: #22201C; --muted: #6E6A61;
+    --panel: rgba(255,255,255,.88); --line: #C4C1B8; --steel:#8A6F4D; --warn:#B3402E;
+  }
+  html, body { margin:0; height:100%; overflow:hidden; background: linear-gradient(var(--bg1), var(--bg2)); font-family: "Avenir Next","Avenir","Segoe UI",system-ui,sans-serif; color: var(--ink); }
+  canvas { display:block; width:100vw; height:100vh; touch-action:none; cursor:grab; }
+  canvas.dragging { cursor:grabbing; }
+
+  .hud { position:fixed; top:0; right:0; padding:10px 12px; display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; max-width:calc(100vw - 320px); }
+  button {
+    background:var(--panel); border:1px solid var(--line); border-radius:7px; color:var(--ink);
+    font:inherit; font-size:.68rem; padding:.28rem .55rem; cursor:pointer; backdrop-filter: blur(6px);
+  }
+  button.active { outline:2px solid var(--steel); }
+
+  aside {
+    position:fixed; top:10px; left:10px; bottom:10px; width:272px; overflow-y:auto;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:10px 14px 12px; backdrop-filter: blur(8px);
+  }
+  aside h1 { font-size:.9rem; margin:0; }
+  aside .sub { font-family:ui-monospace,Menlo,monospace; font-size:.6rem; letter-spacing:.06em; color:var(--muted); margin-bottom:4px; }
+  aside h2 { font-family:ui-monospace,Menlo,monospace; font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:var(--steel); margin:8px 0 3px; border-top:1px solid var(--line); padding-top:6px; }
+  .ctl { margin:2px 0; }
+  .ctl label { display:flex; justify-content:space-between; font-size:.7rem; margin-bottom:0; }
+  .ctl label b { font-family:ui-monospace,Menlo,monospace; font-weight:600; }
+  input[type=range] { width:100%; accent-color:#3A3835; height:16px; margin:0; }
+  .chks { display:grid; grid-template-columns:1fr 1fr; gap:0 8px; }
+  .chk label { display:flex; gap:5px; align-items:center; font-size:.66rem; margin:2px 0; cursor:pointer; line-height:1.25; }
+  input[type=checkbox], input[type=radio] { accent-color:#3A3835; width:13px; height:13px; flex:none; }
+  #uit { font-size:.7rem; line-height:1.4; }
+  #uit table { width:100%; border-collapse:collapse; font-family:ui-monospace,Menlo,monospace; font-size:.64rem; }
+  #uit td { padding:.08rem 0; }
+  #uit td:last-child { text-align:right; font-weight:600; }
+  .warn { color:var(--warn); font-size:.66rem; margin-top:4px; font-weight:600; }
+  .ok { color:#3F7A45; font-size:.66rem; margin-top:4px; font-weight:600; }
+  .hint {
+    position:fixed; bottom:10px; left:0; right:0; text-align:center; pointer-events:none;
+    font-family:ui-monospace,Menlo,monospace; font-size:.66rem; letter-spacing:.08em; color:var(--muted);
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<aside>
+  <h1>Pergola Studio</h1>
+  <div class="sub">zwevend · zwart douglas · wip-principe</div>
+
+  <h2>Maten (cm)</h2>
+  <div class="ctl"><label>breedte dak <b id="vB">365</b></label><input type="range" id="sB" min="300" max="450" step="5" value="365"></div>
+  <div class="ctl"><label>diepte dak <b id="vD">320</b></label><input type="range" id="sD" min="250" max="500" step="5" value="320"></div>
+  <div class="ctl"><label>duo-afstand (h.o.h.) <b id="vduo">90</b></label><input type="range" id="sduo" min="60" max="150" step="5" value="90"></div>
+  <div class="ctl"><label>oversteek achter <b id="vover">30</b></label><input type="range" id="sover" min="20" max="60" step="5" value="30"></div>
+  <div class="ctl"><label>paalhoogte (kop) <b id="vH">260</b></label><input type="range" id="sH" min="230" max="290" step="5" value="260"></div>
+  <div class="ctl"><label>dakhout h.o.h. <b id="vlam">35</b></label><input type="range" id="slam" min="25" max="80" step="1" value="35"></div>
+  <div class="ctl"><label>voorhoekpaal terug <b id="vterug">35</b></label><input type="range" id="sterug" min="0" max="80" step="5" value="35"></div>
+  <div class="ctl"><label>kleine schoor (maat) <b id="vA">90</b></label><input type="range" id="sA" min="60" max="120" step="5" value="90"></div>
+
+  <h2>Onderdelen</h2>
+  <div class="chks">
+  <div class="chk"><label><input type="checkbox" id="cSZ" checked> schoor zweef-zijde</label></div>
+  <div class="chk"><label><input type="checkbox" id="cSP" checked> schoor paal-zijde</label></div>
+  <div class="chk"><label><input type="checkbox" id="cPanZ" checked> paneel zweef-zijde</label></div>
+  <div class="chk"><label><input type="checkbox" id="cPanP" checked> paneel paal-zijde</label></div>
+  <div class="chk"><label><input type="checkbox" id="cWand"> achterwand latten</label></div>
+  <div class="chk"><label><input type="checkbox" id="cRol"> achterwand rolgordijn</label></div>
+  <div class="chk"><label><input type="checkbox" id="cHoek" checked> voorhoekpaal</label></div>
+  <div class="chk"><label><input type="checkbox" id="cDoek" checked> schaduwdoek</label></div>
+  <div class="chk"><label><input type="checkbox" id="cBalk"> dak 15×15 balken</label></div>
+  <div class="chk"><label><input type="checkbox" id="cMas"> liggers massief 15×15</label></div>
+  </div>
+
+  <h2>Fundering — drukpalen</h2>
+  <div class="chk"><label><input type="radio" name="fd" value="basic" checked> prefab poer 30×30 (budget, € 25)</label></div>
+  <div class="chk"><label><input type="radio" name="fd" value="antraciet"> gadero antraciet 14×14 met 28×28-voet (€ 66)</label></div>
+  <div class="chk"><label><input type="radio" name="fd" value="blok"> gestorte sleufblokken (zwaarst, mortelbeton)</label></div>
+
+  <h2>Fundering — trekanker achterpaal</h2>
+  <div class="chk"><label><input type="radio" name="ft" value="tegel" checked> tegelanker: 2 tegels + draadeind (0 beton)</label></div>
+  <div class="chk"><label><input type="radio" name="ft" value="gestort"> gestorte trekpoer (±21 zakken)</label></div>
+  <div class="chk"><label><input type="radio" name="ft" value="b2"> prefab + dwarsstangen + 4 zakken</label></div>
+
+  <h2>Belasting</h2>
+  <div class="ctl"><label>dakbelasting <b id="vbel">25 kg/m²</b></label><input type="range" id="sbel" min="0" max="60" step="5" value="25"></div>
+  <div class="sub" style="margin-top:0">0 droog · 25 wind op doek · 50 storm+sneeuw</div>
+
+  <h2>Uitkomsten</h2>
+  <div id="uit"></div>
+  <div id="melding"></div>
+  <button id="bSave" style="width:100%;margin-top:8px;font-weight:700;padding:.45rem;font-size:.74rem">🗎 Bouwtekening (print / PDF)</button>
+</aside>
+
+<div class="hud">
+  <button id="bAuto" class="active">⟲ draaien</button>
+  <button data-view="hoek">hoek</button>
+  <button data-view="voor">voor</button>
+  <button data-view="zij">zweef-zijde</button>
+  <button data-view="jaloezie">paal-zijde</button>
+  <button data-view="achter">achter</button>
+  <button data-view="boven">boven</button>
+  <button id="bDoek">doek dicht</button>
+  <button id="bKracht" class="active">krachten</button>
+  <button id="bMaat" class="active">maten</button>
+</div>
+<div class="hint">slepen = draaien · scrollen / knijpen = zoomen · dubbelklik = reset</div>
+
+<script>
+'use strict';
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+/* ---------- parameters ---------- */
+const P = { B:365, D:320, duo:90, over:30, H:260, lam:35, terug:35, A:90, bel:25 };
+const opt = { schoorZ:true, schoorP:true, panZ:true, panP:true, wandLat:false, wandRol:false, hoekpaal:true, doek:true, massief:false, balk:false, poeren:true, fundDruk:'basic', fundTrek:'tegel' };
+let doekDicht=false, showK=true, showM=true;
+
+/* ---------- model-opbouw (alle maten in cm) ----------
+   x = breedte · y = hoogte (0 = maaiveld) · z = diepte (0 = achter) */
+const parts = [];
+function hex(c){ return [parseInt(c.slice(1,3),16), parseInt(c.slice(3,5),16), parseInt(c.slice(5,7),16)]; }
+const WOOD=hex('#211f1d'), WOOD2=hex('#2a2724'), LAT=hex('#1b1a18'), BETON=hex('#9a948a'), DOEK=hex('#4a4744');
+
+function addBox(x1,y1,z1,x2,y2,z2,col){
+  const v=[[x1,y1,z1],[x2,y1,z1],[x2,y2,z1],[x1,y2,z1],[x1,y1,z2],[x2,y1,z2],[x2,y2,z2],[x1,y2,z2]];
+  parts.push({v, quads:[[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[3,2,6,7],[4,5,1,0]], col});
+}
+function addKarbeel(X, zF, A, H){
+  const y0=H-20-A;
+  const p=[[y0-10.6,zF],[y0+10.6,zF],[H-20,zF+A-10.6],[H-20,zF+A+10.6]];
+  const v=[];
+  for(const dx of [-7.5,7.5]) for(const [y,z] of p) v.push([X+dx,y,z]);
+  parts.push({v, quads:[[0,1,2,3],[7,6,5,4],[0,4,5,1],[1,5,6,2],[2,6,7,3],[3,7,4,0]], col:WOOD});
+}
+
+function fysica(){
+  const B=P.B/100, D=P.D/100, duo=P.duo/100, over=P.over/100, A=P.A/100;
+  const zweefCm = P.D - P.duo - P.over;
+  const a = zweefCm/100, c = duo+over;
+  const nLam = Math.max(2, Math.round((P.D-(opt.balk?15:5))/P.lam)+1);
+  // eigen gewicht (douglas 550 kg/m³)
+  const wLam = nLam*B*(opt.balk?12.4:1.73), wLig = (opt.massief?2*12.4:4*5.5)*D, wBalk = 2*(B-0.6)*5.5, wSch = 31;
+  const wDak = wLam+wLig+wBalk+wSch;
+  const wPalen = 5*(P.H/100)*12.4;
+  const w = wDak/2/D;                        // eigen dak per zijde per m
+  const q = w + P.bel*(B/2);                 // kg/m per zijde
+  const M = Math.max(0, q*(a*a - c*c)/2);    // kg·m om de voorpaal
+  const trek = Math.round(M/duo/5)*5;
+  const druk = Math.round((q*D + M/duo + 35)/5)*5;
+  // rekenwaarde-trek (altijd bij 50 kg/m², onafhankelijk van de schuif) — hierop wordt de fundering gedimensioneerd
+  const q50 = w + 50*(B/2);
+  const trekR = Math.round(Math.max(0, q50*(a*a - c*c)/2)/duo/5)*5;
+  // blok-advies (3× veiligheid op de rekenwaarde, doorsnede 50×70)
+  const nodig = Math.max(400, 3*trekR);
+  const blokL = Math.max(P.duo+50, Math.ceil(nodig/2400/0.35*100/10)*10);
+  const blokKg = Math.round(blokL/100*0.35*2400/10)*10;
+  // doorbuiging voorbij de schoor (sandwich 2× 5×20 óf massief 15×15, E=10 GPa)
+  const EI = opt.massief? 4.22e5 : 6.67e5;      // N·m²
+  const Wm = opt.massief? 5.63e5 : 6.7e5;       // mm³
+  const f = Math.max(0.15, a - (opt.schoorZ? A:0));
+  const dbg = (q*9.81)*Math.pow(f,4)/(8*EI)*1000;
+  // ligger-spanning bij de schoorkop
+  const sigma = (q*9.81*f*f/2*1000)/Wm;
+  // losse trekpoer (3× de rekenwaarde-trek, diepte 70, vierkant) — fallback bij hoge trek
+  const poerZ = Math.max(50, Math.ceil(Math.sqrt(nodig/2400/0.7)*100/10)*10);
+  const poerKg = Math.round((poerZ/100)*(poerZ/100)*0.7*2400/10)*10;
+  // trekanker-capaciteit per gekozen optie
+  const ankerKg = Math.round((0.36*0.65*1700 + 45)/5)*5;                     // tegelanker: grondkolom + tegels
+  const capLbl = opt.fundTrek==='tegel'? 'tegelanker 2× 60×60' : opt.fundTrek==='b2'? 'prefab + kraag (B2)' : 'gestorte trekpoer';
+  // opleggingen paal-zijde (3 steunpunten: achterpaal · voorpaal · voorhoekpaal)
+  const L2=Math.max(0.3,(P.D-P.terug-P.over-P.duo)/100), oF=P.terug/100;
+  const pA=Math.max(0, Math.round(q*(over + 0.4*duo)/5)*5);
+  const pH=Math.round(q*(oF + 0.4*L2)/5)*5;
+  const pV=Math.max(0, Math.round((q*D - pA - pH + 20)/5)*5);
+  const capTrek = opt.fundTrek==='tegel'? ankerKg : opt.fundTrek==='b2'? 380 : poerKg;
+  return { zweefCm, nLam, wDak:Math.round(wDak/5)*5, wHout:Math.round((wDak+wPalen+12)/5)*5,
+           trek, trekR, druk, pA, pV, pH, blokL, blokKg, veilig:(blokKg/Math.max(trekR,1)), poerZ, poerKg, ankerKg, capTrek, capLbl, dbg, sigma };
+}
+
+function buildModel(){
+  parts.length=0;
+  const {B,D,duo,over,H,terug}=P, A=P.A;
+  const xZ=30, xP=B-30;                       // zweef-zijde x=30 · paal-zijde x=B-30
+  const zA=over, zV=over+duo, zH=D-terug;
+  const fx=fysica();
+  // beton (koppen 5 cm boven maaiveld)
+  if(opt.poeren){
+    for(const [qx2,qz2] of [[xZ,zA],[xZ,zV],[xP,zA],[xP,zV]]) addBox(qx2-15,-1,qz2-15, qx2+15,5,qz2+15, BETON);
+    if(opt.hoekpaal) addBox(xP-15,-1,zH-15, xP+15,5,zH+15, BETON);
+  } else {
+    const bl=fx.blokL, b0=Math.max(0, zV+20-bl);
+    addBox(xZ-30,-1,b0, xZ+30,5,zV+20, BETON);
+    addBox(xP-25,-1,Math.max(0,zV+15-Math.max(120,duo+40)), xP+25,5,zV+15, BETON);
+    if(opt.hoekpaal) addBox(xP-20,-1,zH-20, xP+20,5,zH+20, BETON);
+  }
+  // palen (bij massieve liggers eindigt de paal ónder de ligger)
+  const topP = opt.massief? H-20 : H;
+  const posts=[[xZ,zA],[xZ,zV],[xP,zA],[xP,zV]];
+  if(opt.hoekpaal) posts.push([xP,zH]);
+  for(const [px,pz] of posts) addBox(px-7.5,0,pz-7.5, px+7.5,topP,pz+7.5, WOOD);
+  // liggers: sandwich 2× 5×20 óf massief 15×15
+  if(opt.massief){ for(const bx of [xZ-7.5,xP-7.5]) addBox(bx,H-20,0, bx+15,H,D, WOOD); }
+  else { for(const bx of [xZ-12.5,xZ+7.5,xP-12.5,xP+7.5]) addBox(bx,H-20,0, bx+5,H,D, WOOD); }
+  // koppelbalk (achterrand) en voorbalk (voorrand) — doorlopend over de volle dakbreedte
+  addBox(0,H-20,-5, B,H,0, WOOD);
+  addBox(0,H-20,D, B,H,D+5, WOOD);
+  // kleine schoren per zijde (vinkjes)
+  if(opt.schoorZ) addKarbeel(xZ, zV+7.5, A, H);
+  if(opt.schoorP) addKarbeel(xP, zV+7.5, A, H);
+  // dakhout: lamellen 4,5×7 op hun kant óf balken 15×15
+  const dh = opt.balk? 7.5 : 2.25, dhH = opt.balk? 15 : 7;
+  const n=fx.nLam, s=(D-2*dh)/(n-1);
+  for(let i=0;i<n;i++){ const cz=dh+i*s; addBox(0,H,cz-dh, B,H+dhH,cz+dh, WOOD2); }
+  // jaloezie-panelen in de duo-vakken (per zijde) + achterwand (latten of rolgordijn)
+  for(let y=30; y+7<=H-22; y+=10){
+    if(opt.panZ) addBox(xZ-1.1,y,zA+7.5, xZ+1.1,y+7,zV-7.5, LAT);
+    if(opt.panP) addBox(xP-1.1,y,zA+7.5, xP+1.1,y+7,zV-7.5, LAT);
+    if(opt.wandLat) addBox(xZ+7.5,y,zA-1.1, xP-7.5,y+7,zA+1.1, LAT);
+  }
+  if(opt.wandRol){
+    addBox(xZ+7.5,H-30,zA-11.5, xP-7.5,H-21,zA-3.5, WOOD);            // cassette/buis onder de koppelbalk
+    addBox(xZ+12,95,zA-8, xP-12,H-30,zA-6.5, DOEK);                   // doek half afgerold
+    addBox(xZ+12,92,zA-9, xP-12,95,zA-5.5, WOOD);                     // onderlat
+  }
+  // doek (vinkje + open/dicht-knop)
+  if(!opt.doek){ /* geen doek */ }
+  else if(doekDicht){
+    const n2=8, sp=(D-over-20)/n2;
+    for(let i=0;i<n2;i++){ const z1=zA+5+i*sp; addBox(48,H-29-(i%2)*4,z1, B-48,H-24-(i%2)*4,z1+sp, DOEK); }
+  } else {
+    addBox(48,H-34,zA-5, B-48,H-22,zV-10, DOEK);
+  }
+}
+
+/* ---------- renderer ---------- */
+const LIGHT=[0.45,0.85,0.35];
+let yaw=3.78, pitch=0.34, dist=1000, auto=true, W,H2,DPR;
+const nrm=a=>{const l=Math.hypot(a[0],a[1],a[2])||1; return [a[0]/l,a[1]/l,a[2]/l];};
+const LN=nrm(LIGHT);
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const crs=(a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+
+function resize(){ DPR=Math.min(devicePixelRatio||1,2); W=innerWidth; H2=innerHeight; cv.width=W*DPR; cv.height=H2*DPR; }
+addEventListener('resize',()=>{resize(); draw();});
+resize();
+
+function draw(){
+  const CTR=[P.B/2, P.H/2-15, P.D/2];
+  const CX = W/2 + 120;                       // model rechts van het paneel
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,W,H2);
+  const cy=Math.cos(yaw), sy=Math.sin(yaw), cp=Math.cos(pitch), sp=Math.sin(pitch), F=900;
+  const Pr=(x,y,z)=>{
+    let X=x-CTR[0], Y=y-CTR[1], Z=z-CTR[2];
+    let x1=X*cy - Z*sy, z1=X*sy + Z*cy;
+    let y2=Y*cp - z1*sp, z2=Y*sp + z1*cp + dist;
+    if(z2<80) return null;
+    const s=F/z2; return [x1*s + CX, -y2*s + H2*0.55, z2];
+  };
+  // grond + schaduw
+  const g=[Pr(-320,0,-260),Pr(P.B+320,0,-260),Pr(P.B+320,0,P.D+320),Pr(-320,0,P.D+320)];
+  if(g.every(Boolean)){ ctx.fillStyle='rgba(125,120,105,.18)'; poly(g); }
+  const s2=[Pr(4,0,4),Pr(P.B-4,0,4),Pr(P.B-4,0,P.D+20),Pr(4,0,P.D+20)];
+  if(s2.every(Boolean)){ ctx.fillStyle='rgba(0,0,0,.12)'; poly(s2); }
+  // vlakken
+  const faces=[];
+  for(const p of parts){
+    const tv=p.v.map(pt=>Pr(pt[0],pt[1],pt[2]));
+    if(tv.some(t=>!t)) continue;
+    for(const q of p.quads){
+      const A2=p.v[q[0]], B2=p.v[q[1]], C2=p.v[q[2]];
+      const n=nrm(crs(sub(B2,A2), sub(C2,A2)));
+      const sh=0.62 + 0.48*Math.max(0, n[0]*LN[0]+n[1]*LN[1]+n[2]*LN[2]);
+      faces.push({pts:q.map(i=>tv[i]), z:(tv[q[0]][2]+tv[q[1]][2]+tv[q[2]][2]+tv[q[3]][2])/4, col:p.col, sh});
+    }
+  }
+  faces.sort((a,b)=>b.z-a.z);
+  for(const f of faces){
+    const [r,g2,b]=f.col;
+    ctx.fillStyle=`rgb(${r*f.sh|0},${g2*f.sh|0},${b*f.sh|0})`;
+    poly(f.pts);
+    ctx.strokeStyle='rgba(0,0,0,.18)'; ctx.lineWidth=.5; ctx.stroke();
+  }
+  // krachtpijlen: zweef-duo (druk + trek) én de opleggingen van de paal-zijde
+  if(showK){
+    const fx=fysica(), zA=P.over, zV=P.over+P.duo, xR=P.B-6;
+    arrow(Pr(6,P.H+38,zV), Pr(6,P.H-52,zV), '#B3402E', `druk ±${fx.druk} kg`, -8);
+    arrow(Pr(6,P.H-130,zA), Pr(6,P.H-30,zA), '#B3402E', `trek ±${fx.trek} kg`, -8);
+    if(opt.hoekpaal){
+      arrow(Pr(xR,P.H+34,zA), Pr(xR,P.H-38,zA), '#B3402E', `±${fx.pA} kg`, 8);
+      arrow(Pr(xR,P.H+34,zV), Pr(xR,P.H-38,zV), '#B3402E', `±${fx.pV} kg`, 8);
+      arrow(Pr(xR,P.H+34,P.D-P.terug), Pr(xR,P.H-38,P.D-P.terug), '#B3402E', `±${fx.pH} kg`, 8);
+    } else {
+      arrow(Pr(xR,P.H+38,zV), Pr(xR,P.H-52,zV), '#B3402E', `druk ±${fx.druk} kg`, 8);
+      arrow(Pr(xR,P.H-130,zA), Pr(xR,P.H-30,zA), '#B3402E', `trek ±${fx.trek} kg`, 8);
+    }
+  }
+  // maatlijnen
+  if(showM){
+    const zV=P.over+P.duo, zw=P.D-zV;
+    dim(Pr(0,2,P.D+35), Pr(P.B,2,P.D+35), `${P.B}`);                       // breedte, vóór
+    dim(Pr(P.B+40,2,0), Pr(P.B+40,2,P.D), `${P.D}`);                       // diepte, paal-zijde
+    dim(Pr(-40,2,zV), Pr(-40,2,P.D), `${zw} zweef`);                        // vrije zweef, zweef-zijde
+    dim(Pr(-40,2,P.over), Pr(-40,2,zV), `${P.duo}`);                        // duo
+    dim(Pr(-40,2,0), Pr(-40,2,P.over), `${P.over}`);                        // oversteek achter
+    dim(Pr(-75,2,P.over), Pr(-75,2,P.D), `${P.D-P.over} v.a. achterpaal`);  // tweede paal → voorrand
+    dim(Pr(P.B+40,0,P.D+35), Pr(P.B+40,P.H+7,P.D+35), `±${P.H+7} hoog`);   // hoogte, voorhoek
+  }
+}
+function poly(pts){ ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.closePath(); ctx.fill(); }
+function dim(a,b,txt){
+  if(!a||!b) return;
+  const c='#6E6A61';
+  ctx.strokeStyle=c; ctx.fillStyle=c; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+  for(const p of [a,b]){ ctx.beginPath(); ctx.arc(p[0],p[1],3,0,7); ctx.fill(); }
+  ctx.font='600 11px ui-monospace,Menlo,monospace';
+  ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.lineWidth=3;
+  const mx=(a[0]+b[0])/2+6, my=(a[1]+b[1])/2-5;
+  ctx.strokeText(txt,mx,my); ctx.fillText(txt,mx,my);
+}
+function arrow(a,b,col,txt,dx){
+  if(!a||!b) return;
+  ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+  const ang=Math.atan2(b[1]-a[1], b[0]-a[0]);
+  ctx.beginPath(); ctx.moveTo(b[0],b[1]);
+  ctx.lineTo(b[0]-11*Math.cos(ang-0.42), b[1]-11*Math.sin(ang-0.42));
+  ctx.lineTo(b[0]-11*Math.cos(ang+0.42), b[1]-11*Math.sin(ang+0.42));
+  ctx.closePath(); ctx.fill();
+  ctx.font='600 12px ui-monospace,Menlo,monospace';
+  ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.lineWidth=3;
+  const mx=(a[0]+b[0])/2+(dx||8), my=(a[1]+b[1])/2;
+  ctx.strokeText(txt,mx,my); ctx.fillText(txt,mx,my);
+}
+
+/* ---------- uitkomsten-paneel ---------- */
+function updUI(){
+  const fx=fysica();
+  const rows=[
+    ['vrije zweef voor', fx.zweefCm+' cm'],
+    [opt.balk?'dakbalken 15×15':'lamellen 4,5×7', fx.nLam+' st'],
+    ['hoogte totaal', '±'+(P.H+(opt.balk?15:7))+' cm'],
+    ['hout totaal', '±'+fx.wHout+' kg'],
+    ['trek achterpaal', '±'+fx.trek+' kg'],
+    ['druk voorpaal', '±'+fx.druk+' kg'],
+    ...(opt.poeren? [
+      ['trekanker', fx.capLbl+' ≈ '+fx.capTrek+' kg'],
+      ['veiligheid trekanker', (fx.capTrek/Math.max(fx.trekR,1)).toFixed(1)+'×'],
+      ['drukpalen', opt.fundDruk==='antraciet'?'gadero antraciet 14×14':'prefab poer 30×30'],
+    ] : [
+      ['blok zweef-zijde', fx.blokL+'×50×70 ≈ '+fx.blokKg+' kg'],
+      ['veiligheid blok', fx.veilig>=99?'—':fx.veilig.toFixed(1)+'×'],
+    ]),
+    ['richtprijs materiaal', '±€ '+kosten(fx).tot],
+    ['doorbuiging rand', fx.dbg<1?'<1 mm':'±'+fx.dbg.toFixed(0)+' mm'],
+  ];
+  document.getElementById('uit').innerHTML = '<table>'+rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')+'</table>';
+  const m=[];
+  if(fx.zweefCm<50) m.push('⚠ vrijwel geen zweef meer — vergroot de diepte of verklein duo/oversteek');
+  if(fx.trek>550) m.push('⚠ trek > 550 kg: buiten dit bout-recept — duo vergroten of diepte terug');
+  if(fx.sigma>8) m.push('⚠ ligger te zwaar belast — sandwich naar 6,5 × 20 of schoor aanvinken/vergroten');
+  if(!opt.schoorZ && fx.zweefCm>230) m.push('⚠ zonder schoor is >230 zweef niet aan te raden — schoor aanvinken of diepte terug');
+  if(!opt.hoekpaal) m.push('⚠ zonder voorhoekpaal zweven béide zijden: óók daar een trekanker (trek geldt dan aan twee kanten) en vink beide schoren aan');
+  if(opt.poeren && fx.capTrek/Math.max(fx.trekR,1) < 2) m.push('⚠ trekanker te licht ('+(fx.capTrek/Math.max(fx.trekR,1)).toFixed(1)+'×) — kies de gestorte trekpoer of breng de diepte terug');
+  if(opt.poeren && opt.fundTrek==='b2') m.push('ℹ B2: draadeind moet dóór de poer (plaat + moer onder), niet op slappe grond');
+  if(opt.balk && P.lam<50) m.push('⚠ 15×15-balken h.o.h. < 50 wordt erg zwaar en donker — 60 à 70 is gangbaar');
+  if(!opt.balk && P.lam>50) m.push('⚠ lamellen h.o.h. > 50 oogt schraal — of kies 15×15-balken');
+  if(opt.massief) m.push('ℹ massieve liggers: verbinding wordt pen-gat op de paalkoppen + ingelijmd draadeind M16 op de trek-achterpaal (zie bouwbeschrijving)');
+  if(opt.wandRol) m.push('ℹ rolgordijn: aan de koppelbalk hangen, bij storm en afwezigheid altijd oprollen (het is een zeil)');
+  if(opt.wandLat && opt.wandRol) m.push('⚠ kies latten óf rolgordijn voor de achterwand — beide tegelijk heeft geen zin');
+  if(P.B-60>320) m.push('⚠ lamel-overspanning > 320: lamellen 4,5 × 9,5 nemen');
+  if(fx.dbg>12) m.push('⚠ doorbuiging fors — schoor vergroten of diepte terug');
+  document.getElementById('melding').innerHTML = m.length? m.map(x=>`<div class="${x.startsWith('ℹ')?'ok':'warn'}">${x}</div>`).join('') : '<div class="ok">✓ alles binnen het recept van de bouwbeschrijving</div>';
+}
+
+/* ---------- interactie ---------- */
+function bindSlider(id, key, label, suffix){
+  const el=document.getElementById(id);
+  P[key]=+el.value; document.getElementById(label).textContent=el.value+(suffix||'');   // sync met evt. door de browser herstelde stand
+  el.oninput=()=>{ P[key]=+el.value; document.getElementById(label).textContent=el.value+(suffix||''); buildModel(); updUI(); draw(); };
+}
+bindSlider('sB','B','vB'); bindSlider('sD','D','vD'); bindSlider('sduo','duo','vduo');
+bindSlider('sover','over','vover'); bindSlider('sH','H','vH'); bindSlider('slam','lam','vlam');
+bindSlider('sterug','terug','vterug'); bindSlider('sA','A','vA'); bindSlider('sbel','bel','vbel',' kg/m²');
+
+function bindChk(id,key){
+  const el=document.getElementById(id);
+  opt[key]=el.checked;                                    // sync met evt. door de browser herstelde stand
+  el.onchange=()=>{ opt[key]=el.checked; buildModel(); updUI(); draw(); };
+}
+bindChk('cSZ','schoorZ'); bindChk('cSP','schoorP'); bindChk('cPanZ','panZ'); bindChk('cPanP','panP');
+bindChk('cWand','wandLat'); bindChk('cRol','wandRol');
+bindChk('cHoek','hoekpaal'); bindChk('cDoek','doek'); bindChk('cMas','massief'); bindChk('cBalk','balk');
+function bindRadio(name,key){
+  for(const el of document.querySelectorAll(`input[name=${name}]`)){
+    if(el.checked) opt[key]=el.value;
+    el.onchange=()=>{ opt[key]=el.value; opt.poeren = opt.fundDruk!=='blok'; buildModel(); updUI(); draw(); };
+  }
+  opt.poeren = opt.fundDruk!=='blok';
+}
+bindRadio('fd','fundDruk'); bindRadio('ft','fundTrek');
+
+let dragging=false, lx=0, ly=0, pinch=0;
+cv.addEventListener('pointerdown',e=>{dragging=true; auto=false; bAuto.classList.remove('active'); lx=e.clientX; ly=e.clientY; cv.classList.add('dragging'); cv.setPointerCapture(e.pointerId);});
+cv.addEventListener('pointermove',e=>{
+  if(!dragging) return;
+  yaw += (e.clientX-lx)*0.008;
+  pitch = Math.max(-0.15, Math.min(1.45, pitch + (e.clientY-ly)*0.006));
+  lx=e.clientX; ly=e.clientY; draw();
+});
+cv.addEventListener('pointerup',()=>{dragging=false; cv.classList.remove('dragging');});
+cv.addEventListener('wheel',e=>{e.preventDefault(); dist=Math.max(450,Math.min(2600,dist*(1+e.deltaY*0.0012))); draw();},{passive:false});
+cv.addEventListener('dblclick',()=>{yaw=3.78; pitch=0.34; dist=1000; draw();});
+cv.addEventListener('touchstart',e=>{ if(e.touches.length===2) pinch=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); },{passive:true});
+cv.addEventListener('touchmove',e=>{
+  if(e.touches.length===2){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    if(pinch){ dist=Math.max(450,Math.min(2600,dist*pinch/d)); draw(); }
+    pinch=d;
+  }
+},{passive:true});
+
+const bAuto=document.getElementById('bAuto');
+bAuto.onclick=()=>{auto=!auto; bAuto.classList.toggle('active',auto); if(auto) tick();};
+const views={ hoek:[3.78,0.34,1000], voor:[Math.PI,0.10,1100], zij:[Math.PI/2,0.10,1150], jaloezie:[-Math.PI/2,0.10,1150], boven:[3.78,1.35,1250], achter:[0,0.12,1100] };
+for(const b of document.querySelectorAll('[data-view]'))
+  b.onclick=()=>{ auto=false; bAuto.classList.remove('active'); [yaw,pitch,dist]=views[b.dataset.view]; draw(); };
+const bDoek=document.getElementById('bDoek');
+bDoek.onclick=()=>{ doekDicht=!doekDicht; bDoek.textContent = doekDicht? 'doek open':'doek dicht'; buildModel(); draw(); };
+const bKracht=document.getElementById('bKracht');
+bKracht.onclick=()=>{ showK=!showK; bKracht.classList.toggle('active',showK); draw(); };
+const bMaat=document.getElementById('bMaat');
+bMaat.onclick=()=>{ showM=!showM; bMaat.classList.toggle('active',showM); draw(); };
+
+function tick(){ if(!auto) return; yaw += 0.004; draw(); requestAnimationFrame(tick); }
+
+/* ---------- kostencalculatie (prijzen online geraadpleegd 12-07-2026) ---------- */
+function handelslengte(l){ for(const h of [250,300,350,400,450,500]) if(l<=h) return h; return 500; }
+
+const BRONNEN=[
+  ['1','vanviegen.com — douglas paal 15×15×300 zwart geïmpregneerd € 59,90 (= € 19,96/m¹)'],
+  ['2','houtgemak.nl — douglas balken/regels fijnbezaagd: 50×150 v.a. € 15,72; 5×20 zwart hiervan afgeleid ≈ € 8,50/m¹'],
+  ['3','houtgemak.nl — douglas regel 50×70 v.a. € 6,42 (≈ € 2,15/m¹ blank; zwart ≈ € 2,70/m¹)'],
+  ['4','houtgemak.nl — douglas plank 22×200 zwart geïmpregneerd v.a. € 16,83; latten 2,2×7 hieruit rippen ≈ € 1,90/m¹'],
+  ['5','gadero.nl — paalhouder/H-anker 15×15 ≈ € 28/st (vgl. wovar.nl H-anker 14×14 € 22,99)'],
+  ['6','gadero.nl — betonpoer antraciet 14×14×50 met 28×28-voet, 35,5 kg, M16-schroefbus € 65,95 (verstelplaat apart); trekpositie: betondingen.nl poer met doorlopend gat ≈ € 25'],
+  ['7','hornbach.nl — SAKRETE snelbetonmortel 25 kg € 8,75 (1 zak ≈ 12,5 l); mortelbeton geleverd ≈ € 200/m³'],
+  ['8','gadero.nl (Nesling-dealer) — harmonicadoek op maat ≈ € 22/m² · RVS-kabelset ≈ € 55'],
+  ['9','wovar.nl — slotbouten M12, carrosserieringen, houtdraadbouten, RVS-schroeven'],
+];
+
+function kosten(fx){
+  const nP=opt.hoekpaal?5:4, nS=(opt.schoorZ?1:0)+(opt.schoorP?1:0);
+  const nLat=Math.floor((P.H-59)/10)+1, latL=P.duo-16;
+  const r=[]; const add=(o,q,u,pr,br,shop)=>r.push({o,q:+q,u,pr,tot:q*pr,br,shop});
+  add('staanders 15×15 zwart', nP*3,'m¹',20.0,'1','vanviegen.com');
+  if(nS) add('kleine schoren 15×15 zwart (uit 1× 300)', 3,'m¹',20.0,'1','vanviegen.com');
+  if(opt.massief) add('liggers massief 15×15 zwart', 2*handelslengte(P.D)/100,'m¹',20.0,'1','vanviegen.com');
+  else add('sandwich-balken 5×20 zwart', 4*handelslengte(P.D)/100,'m¹',8.5,'2','houtgemak.nl');
+  add('koppel- + voorbalk 5×20 zwart', 2*handelslengte(P.B)/100,'m¹',8.5,'2','houtgemak.nl');
+  if(opt.balk) add('dakbalken 15×15 zwart', fx.nLam*handelslengte(P.B+10)/100,'m¹',20.0,'1','vanviegen.com');
+  else add('lamellen 4,5×7 zwart', fx.nLam*handelslengte(P.B+10)/100,'m¹',2.7,'3','houtgemak.nl');
+  const nPan=(opt.panZ?1:0)+(opt.panP?1:0);
+  if(nPan){ add('jaloezie-latten 2,2×7 zwart (panelen)', Math.round(nLat*nPan*latL/100),'m¹',1.9,'4','houtgemak.nl'); add('paneel-regels 4,5×7 zwart', nPan*2*(P.H-50)/100,'m¹',2.7,'3','houtgemak.nl'); }
+  if(opt.wandLat){ add('jaloezie-latten 2,2×7 zwart (achterwand)', Math.round(nLat*(P.B-75)/100),'m¹',1.9,'4','houtgemak.nl'); add('wand-regels 4,5×7 zwart', 2*(P.H-50)/100,'m¹',2.7,'3','houtgemak.nl'); }
+  if(opt.wandRol) add('buitenrolgordijn op maat (±'+((P.B-75)/100).toFixed(1)+' × 2,1 m, antraciet)', 1,'st',150,'8','gadero.nl / jysk.nl');
+  if(opt.poeren){
+    if(opt.fundDruk==='antraciet'){
+      add('betonpoer antraciet 14×14×50 met 28×28-voet (drukpalen)', nP-1,'st',65.95,'6','gadero.nl');
+      add('hoogteverstelplaten M16', nP-1,'st',9,'6','gadero.nl');
+    } else {
+      add('prefab betonpoeren 30×30 incl. plaatdrager (drukpalen)', nP-1,'st',25,'6','betondingen.nl');
+    }
+    if(opt.fundTrek==='tegel'){
+      add('poer met doorlopend gat (trekpositie)', 1,'st',25,'6','betondingen.nl');
+      add('betontegels 60×60 (tegelanker)', 2,'st',6,'7','hornbach.nl');
+      add('draadeind M16 × 100 vz + schotelplaten/moeren', 1,'set',15,'9','wovar.nl');
+    } else if(opt.fundTrek==='gestort'){
+      add('H-anker zwaar 15×15 (trekanker, dwarsstaaf)', 1,'st',28,'5','gadero.nl');
+      add('snelbeton trekpoer (25 kg)', Math.ceil((fx.poerZ/100)*(fx.poerZ/100)*0.7/0.0125),'zak',8.75,'7','hornbach.nl');
+    } else {
+      add('prefab poer trekpositie (doorlopend draadeind!)', 1,'st',25,'6','betondingen.nl');
+      add('dwarsstangen ø12 + kraag: snelbeton', 4,'zak',8.75,'7','hornbach.nl');
+      add('draadeind M16 doorlopend + platen', 1,'set',15,'9','wovar.nl');
+    }
+  } else {
+    add('H-ankers 15×15 (1× als trekanker)', nP,'st',28,'5','gadero.nl');
+    const m3=(fx.blokL/100*0.35 + Math.max(120,P.duo+50)/100*0.30 + (opt.hoekpaal?0.112:0));
+    add('mortelbeton blokken (geleverd)', +m3.toFixed(2),'m³',200,'7','ikwilbetonbestellen.nl');
+  }
+  if(opt.doek){ add('harmonicadoek op maat', +(((P.B-85)/100)*((P.D-50)/100)).toFixed(1),'m²',22,'8','gadero.nl (Nesling)'); add('RVS-kabelset + ogen', 1,'set',55,'8','gadero.nl'); }
+  // kleinmateriaal, uitgesplitst
+  add('slotbouten M12 × 260 vz + moer/ring', 6+2*nS+(opt.hoekpaal?6:4),'st',1.20,'9','wovar.nl');
+  if(nS) add('slotbouten M12 × 320 vz (schoorvoeten)', 2*nS,'st',1.60,'9','wovar.nl');
+  add('slotbouten M12 × 160 vz (paalvoeten)', 2*nP+1,'st',0.90,'9','wovar.nl');
+  add('carrosserieringen ø45 vz', 6,'st',0.60,'9','wovar.nl');
+  add('houtdraadbouten 8 × '+(opt.balk?220:160)+' vz', fx.nLam*(opt.balk?4:2),'st',0.70,'9','wovar.nl');
+  add('hoekverbinders zwart 90×90 (randbalken + hoekpunten)', 12,'st',1.50,'9','wovar.nl');
+  add('afdekdoppen M12 zwart', 30,'st',0.40,'9','wovar.nl');
+  if(nPan||opt.wandLat) add('RVS schroeven 4,5 × 45 (doos 200 — panelen/wand)', 1,'doos',12,'9','wovar.nl');
+  add('RVS schroeven 6 × 90 (doos 50 — regels/karbelen)', 1,'doos',9.5,'9','wovar.nl');
+  add('wapening: 4× staaf ø8 + dwarsstaaf ø12', 1,'set',12,'7','hornbach.nl');
+  add('zwarte beits/olie voor zaagkanten (0,75 l)', 1,'pot',25,'7','hornbach.nl');
+  const tot=r.reduce((a,x)=>a+x.tot,0);
+  return {r, tot: Math.round(tot/5)*5};
+}
+
+/* ---------- technische bouwtekening (print/PDF) ---------- */
+
+function openTekening(){
+  const fx=fysica();
+  const keep=P.bel; P.bel=0; const fx0=fysica(); P.bel=50; const fx50=fysica(); P.bel=keep;
+  const {B,D,duo,over,H,terug,A}=P;
+  const zweef=D-duo-over, zA=over, zV=over+duo, zH=D-terug;
+  const nP=opt.hoekpaal?5:4, nS=(opt.schoorZ?1:0)+(opt.schoorP?1:0);
+  const nLat=Math.floor((H-59)/10)+1, latL=duo-16;
+  const dh=opt.balk?15:4.5, dhOff=dh/2+0.01, sLam=(D-dh)/(fx.nLam-1);
+  const schL=Math.round(A*1.414+18);
+  const blokP=Math.max(120,duo+50);
+  const m3=(fx.blokL/100*0.5*0.7 + blokP/100*0.5*0.6 + (opt.hoekpaal?0.112:0)).toFixed(2);
+  const datum=new Date().toLocaleDateString('nl-NL');
+
+  /* — svg-helpers — */
+  const dimH=(x1,x2,y,t)=>`<line class="dim" x1="${x1}" y1="${y}" x2="${x2}" y2="${y}"/><line class="dim" x1="${x1}" y1="${y-4}" x2="${x1}" y2="${y+4}"/><line class="dim" x1="${x2}" y1="${y-4}" x2="${x2}" y2="${y+4}"/><text class="dt" x="${(x1+x2)/2}" y="${y-4}">${t}</text>`;
+  const dimV=(y1,y2,x,t)=>`<line class="dim" x1="${x}" y1="${y1}" x2="${x}" y2="${y2}"/><line class="dim" x1="${x-4}" y1="${y1}" x2="${x+4}" y2="${y1}"/><line class="dim" x1="${x-4}" y1="${y2}" x2="${x+4}" y2="${y2}"/><text class="dt" x="${x+4}" y="${(y1+y2)/2}" transform="rotate(90 ${x+4} ${(y1+y2)/2})">${t}</text>`;
+
+  /* — BOVENAANZICHT — */
+  let s=1.45, M=80;
+  const px=x=>M+x*s, py=z=>M+(D-z)*s;
+  const bw=M*2+B*s+60, bh=M*2+D*s;
+  let b=[];
+  b.push(`<rect x="${px(0)}" y="${py(D)}" width="${B*s}" height="${D*s}" fill="none" stroke="#999" stroke-dasharray="6 4"/>`);
+  for(let i=0;i<fx.nLam;i++){ const cz=dhOff+i*sLam; b.push(`<rect x="${px(0)}" y="${py(cz)-dh*s/2}" width="${B*s}" height="${dh*s}" fill="#3a3835" opacity=".85"/>`); }
+  const ligs = opt.massief? [[30-7.5,15],[B-30-7.5,15]] : [[30-12.5,5],[30+7.5,5],[B-30-12.5,5],[B-30+7.5,5]];
+  for(const [lx,lw] of ligs) b.push(`<rect x="${px(lx)}" y="${py(D)}" width="${lw*s}" height="${D*s}" fill="#111"/>`);
+  b.push(`<rect x="${px(0)}" y="${py(D)-5*s}" width="${B*s}" height="${5*s}" fill="#111"/>`);
+  b.push(`<rect x="${px(0)}" y="${py(0)}" width="${B*s}" height="${5*s}" fill="#111"/>`);
+  const posts=[[30,zA],[30,zV],[B-30,zA],[B-30,zV]]; if(opt.hoekpaal) posts.push([B-30,zH]);
+  for(const [X,Z] of posts) b.push(`<rect x="${px(X-7.5)}" y="${py(Z+7.5)}" width="${15*s}" height="${15*s}" fill="#000"/>`);
+  if(opt.paneel){ b.push(`<rect x="${px(30-1.5)}" y="${py(zV-7.5)}" width="${3*s}" height="${(duo-15)*s}" fill="#8a6f4d"/>`); b.push(`<rect x="${px(B-30-1.5)}" y="${py(zV-7.5)}" width="${3*s}" height="${(duo-15)*s}" fill="#8a6f4d"/>`); }
+  if(opt.schoorZ) b.push(`<line x1="${px(30)}" y1="${py(zV)}" x2="${px(30)}" y2="${py(zV+A)}" stroke="#8a6f4d" stroke-width="6" stroke-dasharray="8 5"/>`);
+  if(opt.schoorP) b.push(`<line x1="${px(B-30)}" y1="${py(zV)}" x2="${px(B-30)}" y2="${py(zV+A)}" stroke="#8a6f4d" stroke-width="6" stroke-dasharray="8 5"/>`);
+  b.push(dimH(px(0),px(B),py(D)-16,`${B}`));
+  b.push(dimH(px(30),px(B-30),py(D)-36,`${B-60} h.o.h. balklijnen`));
+  b.push(dimV(py(D),py(zV),px(B)+18,`${zweef} zweef`));
+  b.push(dimV(py(zV),py(zA),px(B)+18,`${duo}`));
+  b.push(dimV(py(zA),py(0),px(B)+18,`${over}`));
+  b.push(dimV(py(D),py(0),px(B)+44,`${D} totaal`));
+  if(opt.hoekpaal) b.push(dimV(py(D),py(zH),px(B-60)-14,`${terug}`));
+  b.push(`<text class="dt" x="${px(B/2)}" y="${py(0)+22}">dakhout ${opt.balk?'15×15':'4,5×7 op kant'} · ${fx.nLam} st · h.o.h. ±${Math.round(sLam)} · overstek 30 per zijde</text>`);
+  b.push(`<text class="dt" x="${px(B/2)}" y="${py(D)-56}">VOORZIJDE — van hieruit gezien: paal-zijde links, zweef-zijde rechts</text>`);
+  const bovenSvg=`<svg viewBox="0 0 ${bw} ${bh}" xmlns="http://www.w3.org/2000/svg">${b.join('')}</svg>`;
+
+  /* — ZIJAANZICHT zweef-duo (voorzijde links) — */
+  const s2=1.45, M2=70, GR=M2+ (H+20)*s2;
+  const qx=z=>M2+(D-z)*s2+40, qy=y=>GR-y*s2;
+  const zw=M2*2+D*s2+130, zh2=GR+95*s2;
+  let z2=[];
+  z2.push(`<line x1="${M2-30}" y1="${GR}" x2="${zw-20}" y2="${GR}" stroke="#000" stroke-width="2.5"/>`);
+  if(opt.poeren){
+    z2.push(`<rect x="${qx(zV+15)}" y="${GR}" width="${30*s2}" height="${60*s2}" fill="none" stroke="#777" stroke-dasharray="5 4"/>`);
+    z2.push(`<rect x="${qx(zA+30)}" y="${GR}" width="${60*s2}" height="${72*s2}" fill="none" stroke="#777" stroke-dasharray="5 4"/>`);
+    z2.push(`<line x1="${qx(zA+30)}" y1="${GR+62*s2}" x2="${qx(zA-30)}" y2="${GR+62*s2}" stroke="#181613" stroke-width="4"/>`);
+    z2.push(`<text class="dt" x="${qx(zV-40)}" y="${GR+72*s2+14}">prefab poeren 30×30 · onder de achterpaal het TEGELANKER (2 tegels 60×60 + draadeind M16) — zie detail B</text>`);
+  } else {
+    z2.push(`<rect x="${qx(zV+20)}" y="${GR}" width="${fx.blokL*s2}" height="${70*s2}" fill="none" stroke="#777" stroke-dasharray="5 4"/>`);
+    z2.push(`<text class="dt" x="${qx(zV+20)+fx.blokL*s2/2}" y="${GR+70*s2+14}">gestort blok ${fx.blokL} × 50 × 70 · 2× H-anker · achterste = trekanker (dwarsstaaf ø12)</text>`);
+  }
+  for(const Z of [zA,zV]) z2.push(`<rect x="${qx(Z+7.5)}" y="${qy(opt.massief?H-20:H)}" width="${15*s2}" height="${(opt.massief?H-20:H)*s2}" fill="#1c1b1a"/>`);
+  z2.push(`<rect x="${qx(D)}" y="${qy(H)}" width="${D*s2}" height="${20*s2}" fill="#000"/>`);
+  for(let i=0;i<fx.nLam;i++){ const cz=dhOff+i*sLam; z2.push(`<rect x="${qx(cz+dh/2)}" y="${qy(H+(opt.balk?15:7))}" width="${dh*s2}" height="${(opt.balk?15:7)*s2}" fill="#3a3835"/>`); }
+  if(opt.schoorZ){
+    const y0=H-20-A;
+    z2.push(`<polygon points="${qx(zV+7.5)},${qy(y0-10.6)} ${qx(zV+7.5)},${qy(y0+10.6)} ${qx(zV+7.5+A-10.6)},${qy(H-20)} ${qx(zV+7.5+A+10.6)},${qy(H-20)}" fill="#1c1b1a"/>`);
+    z2.push(dimH(qx(zV+7.5+A),qx(zV+7.5),qy(y0)-6,`${A}`));
+    z2.push(dimV(qy(H-20),qy(y0),qx(zV+7.5+A)+30,`${A}`));
+  }
+  if(opt.paneel) for(let y=30;y+7<=H-22;y+=10) z2.push(`<rect x="${qx(zV-7.5)}" y="${qy(y+7)}" width="${(duo-15)*s2}" height="${7*s2}" fill="#1b1a18" opacity=".6"/>`);
+  z2.push(dimV(qy(H),GR,M2-24,`${H} kop`));
+  z2.push(dimV(qy(H-20),GR,M2-46,`${H-20} vrij`));
+  z2.push(dimH(qx(D),qx(zV),GR+26,`${zweef} vrije zweef`));
+  z2.push(dimH(qx(zV),qx(zA),GR+26,`${duo}`));
+  z2.push(dimH(qx(zA),qx(0),GR+26,`${over}`));
+  z2.push(`<text class="dt" x="${qx(zV)}" y="${qy(H)-26}" fill="#b3402e">druk ±${fx50.druk} kg ↓</text>`);
+  z2.push(`<text class="dt" x="${qx(zA)}" y="${qy(H)-12}" fill="#b3402e">trek ±${fx50.trek} kg ↑ (rekenwaarde)</text>`);
+  const zijSvg=`<svg viewBox="0 0 ${zw} ${zh2}" xmlns="http://www.w3.org/2000/svg">${z2.join('')}</svg>`;
+
+  /* — verbindingsdetails — */
+  const det=[];
+  if(!opt.massief){
+    // DETAIL A: boutgroep sandwich op de paalkop (driehoek)
+    let a=[];
+    a.push(`<rect x="60" y="60" width="300" height="110" fill="#c9c2b4"/>`);                       // sandwich-balk (aanzicht)
+    a.push(`<rect x="168" y="60" width="84" height="220" fill="#8f867a"/>`);                        // paal erachter
+    a.push(`<rect x="60" y="60" width="300" height="110" fill="none" stroke="#181613" stroke-width="2"/>`);
+    a.push(`<circle cx="186" cy="92" r="9" fill="#181613"/><circle cx="234" cy="92" r="9" fill="#181613"/><circle cx="210" cy="140" r="9" fill="#181613"/>`);
+    a.push(`<circle cx="186" cy="92" r="16" fill="none" stroke="#181613" stroke-width="1.5"/><circle cx="234" cy="92" r="16" fill="none" stroke="#181613" stroke-width="1.5"/><circle cx="210" cy="140" r="16" fill="none" stroke="#181613" stroke-width="1.5"/>`);
+    a.push(`<line class="dim" x1="186" y1="34" x2="234" y2="34"/><text class="dt" x="210" y="30">h.o.h. 8</text>`);
+    a.push(dimV(92,140,286,'8'));
+    // doorsnede rechts: 5 | 15 | 5
+    a.push(`<rect x="400" y="60" width="30" height="110" fill="#c9c2b4" stroke="#181613"/><rect x="430" y="60" width="90" height="220" fill="#8f867a" stroke="#181613"/><rect x="520" y="60" width="30" height="110" fill="#c9c2b4" stroke="#181613"/>`);
+    a.push(`<line x1="392" y1="115" x2="558" y2="115" stroke="#181613" stroke-width="5"/>`);
+    a.push(`<rect x="386" y="104" width="8" height="22" fill="#181613"/><rect x="556" y="104" width="8" height="22" fill="#181613"/>`);
+    a.push(dimH(400,430,196,'5'));a.push(dimH(430,520,196,'15'));a.push(dimH(520,550,196,'5'));
+    a.push(`<text class="dt" x="475" y="46">doorsnede: bout M12 × 260 dwars door alles</text>`);
+    det.push({t:'Detail A — boutgroep paalkop (zweef-duo)', svg:`<svg viewBox="0 0 600 300">${a.join('')}</svg>`,
+      cap:`3× slotbout M12 × 260 <b>in driehoek</b> (nooit op één lijn — de driehoek maakt de verbinding momentvast). Gaten exact ø13 boren. Op de <b>trek-achterpaal</b>: carrosserieringen ø45 onder kop én moer, anders trekken de bouten zich in het hout. Aantrekken pas ná het vóórspannen van de voorrand.`});
+  } else {
+    // DETAIL A2: massieve ligger — pen-gat + draadeind
+    let a=[];
+    a.push(`<rect x="120" y="60" width="360" height="80" fill="#c9c2b4" stroke="#181613" stroke-width="2"/>`);   // ligger
+    a.push(`<rect x="255" y="140" width="90" height="140" fill="#8f867a" stroke="#181613" stroke-width="2"/>`);  // paal
+    a.push(`<rect x="285" y="110" width="30" height="30" fill="#6f675c" stroke="#181613"/>`);                    // pen
+    a.push(`<line x1="300" y1="60" x2="300" y2="252" stroke="#181613" stroke-width="4" stroke-dasharray="7 4"/>`);// draadeind
+    a.push(`<rect x="286" y="52" width="28" height="8" fill="#181613"/>`);
+    a.push(`<text class="dt" x="300" y="42">moer + ring, verzonken</text>`);
+    a.push(`<text class="dt" x="416" y="200">draadeind M16 · 30 cm ingelijmd</text>`);
+    a.push(dimV(110,140,240,'pen 5'));
+    det.push({t:'Detail A — massieve ligger op paalkop', svg:`<svg viewBox="0 0 600 300">${a.join('')}</svg>`,
+      cap:`Ligger 15×15 op pen-gat (pen 5×5×5 op de paalkop) met borgbout M12 dwars. Op de <b>trek-achterpaal</b>: ingelijmd draadeind M16, 30 cm de paal in, door de ligger, ring + moer verzonken in de bovenkant (valt onder het dakhout weg).`});
+  }
+  // DETAIL B: trekanker (tegelanker of gestort, afhankelijk van de keuze)
+  if(opt.poeren && opt.fundTrek==='tegel'){
+    let a=[];
+    a.push(`<line x1="30" y1="130" x2="570" y2="130" stroke="#181613" stroke-width="2.5"/>`);
+    a.push(`<text class="dt" x="80" y="122">maaiveld</text>`);
+    a.push(`<rect x="230" y="130" width="140" height="126" fill="none" stroke="#777" stroke-dasharray="5 4" stroke-width="1.5"/>`);
+    a.push(`<line class="dim" x1="230" y1="162" x2="370" y2="162"/><line class="dim" x1="230" y1="194" x2="370" y2="194"/><line class="dim" x1="230" y1="226" x2="370" y2="226"/>`);
+    a.push(`<text class="dt" x="440" y="196">terugvullen in lagen van 15 · aanstampen</text>`);
+    a.push(`<rect x="230" y="256" width="140" height="9" fill="#b5aea2" stroke="#181613"/><rect x="230" y="265" width="140" height="9" fill="#b5aea2" stroke="#181613"/>`);
+    a.push(`<text class="dt" x="452" y="266">2× betontegel 60×60</text>`);
+    a.push(`<rect x="296" y="52" width="8" height="228" fill="#181613"/>`);
+    a.push(`<rect x="274" y="280" width="52" height="7" fill="#181613"/>`);
+    a.push(`<text class="dt" x="300" y="298">schotelplaat + moer ónder de tegels</text>`);
+    a.push(`<polygon points="266,130 334,130 329,86 271,86" fill="#d9d4c8" stroke="#181613" stroke-width="1.6"/>`);
+    a.push(`<text class="dt" x="432" y="102">prefab poer 30×30 · draadeind door het gat</text>`);
+    a.push(`<rect x="284" y="74" width="32" height="7" fill="#181613"/>`);
+    a.push(`<text class="dt" x="150" y="74">plaatdrager · moer boven + onder</text>`);
+    a.push(`<rect x="282" y="24" width="36" height="50" fill="#8f867a" stroke="#181613"/>`);
+    a.push(dimV(130,265,200,'70'));
+    det.push({t:'Detail B — tegelanker onder de zweef-achterpaal', svg:`<svg viewBox="0 0 600 310">${a.join('')}</svg>`,
+      cap:`De achterpaal wordt omhoog getrokken (±${fx50.trek} kg rekenwaarde). Het tegelanker houdt tegen met de <b>grondkolom boven de tegels</b>: ≈ ${fx.ankerKg} kg = ${(fx.ankerKg/Math.max(fx50.trek,1)).toFixed(1)}×. Cruciaal: draadeind met plaat + moer <b>onder</b> de tegels, plaatdrager <b>trekvast</b> (moeren boven én onder) en de put in lagen aanstampen. Géén gestort beton nodig. Niet toepassen op veen.`});
+  } else {
+    let a=[];
+    a.push(`<line x1="30" y1="150" x2="570" y2="150" stroke="#181613" stroke-width="2.5"/>`);
+    a.push(`<text class="dt" x="80" y="142">maaiveld</text>`);
+    a.push(`<rect x="200" y="150" width="200" height="120" fill="none" stroke="#777" stroke-dasharray="5 4" stroke-width="1.5"/>`);
+    a.push(`<rect x="262" y="30" width="76" height="112" fill="#8f867a" stroke="#181613" stroke-width="2"/>`);
+    a.push(`<rect x="252" y="118" width="10" height="60" fill="#444"/><rect x="338" y="118" width="10" height="60" fill="#444"/>`);
+    a.push(`<rect x="292" y="142" width="16" height="100" fill="#444"/>`);
+    a.push(`<rect x="252" y="236" width="96" height="10" fill="#444"/>`);
+    a.push(`<circle cx="300" cy="70" r="7" fill="#181613"/><circle cx="278" cy="98" r="7" fill="#181613"/><circle cx="322" cy="98" r="7" fill="#181613"/>`);
+    a.push(dimV(150,270,420,'70'));
+    a.push(`<text class="dt" x="470" y="244">dwarsstaaf ø12 door het been</text>`);
+    det.push({t:'Detail B — trekanker achterpaal (gestort blok)', svg:`<svg viewBox="0 0 600 300">${a.join('')}</svg>`,
+      cap:`Het H-anker van de achterpaal werkt op <b>trek</b> (±${fx50.trek} kg). Been ≥ 60 cm ingestort mét dwarsstaaf ø12 onderin. Paalvoet met 3× M12; onderkant paal 1 cm vrij van het beton.`});
+  }
+  // DETAIL C: kleine schoor
+  if(nS){
+    let a=[];
+    a.push(`<rect x="60" y="40" width="480" height="52" fill="#c9c2b4" stroke="#181613" stroke-width="2"/>`);      // ligger
+    a.push(`<rect x="420" y="40" width="60" height="240" fill="#8f867a" stroke="#181613" stroke-width="2"/>`);     // paal
+    a.push(`<polygon points="420,206 420,164 258,92 300,92" fill="#6f675c" stroke="#181613" stroke-width="2" transform="translate(0,0)"/>`);
+    a.push(`<circle cx="282" cy="76" r="6" fill="#181613"/><circle cx="306" cy="76" r="6" fill="#181613"/>`);
+    a.push(`<circle cx="436" cy="172" r="6" fill="#181613"/><circle cx="436" cy="196" r="6" fill="#181613"/>`);
+    a.push(dimH(279,420,116,`${A}`));
+    a.push(dimV(92,185,530,`${A}`));
+    a.push(`<text class="dt" x="180" y="130">kop: 2× M12 × 260 dwars door de sandwich</text>`);
+    a.push(`<text class="dt" x="330" y="240">voet: 2× M12 × 320 óf 3 cm inkepen (sterker)</text>`);
+    det.push({t:'Detail C — kleine schoor (45°, verticale voet- en horizontale kopsnede)', svg:`<svg viewBox="0 0 600 300">${a.join('')}</svg>`,
+      cap:`Schoor 15×15, exact even dik als de paal: hij valt precies tussen de sandwich-balken en wordt daar geklemd. Zaag beide koppen op 45° (eerst een proefkop op een restje). <b>Strak klemmen tijdens het boren</b> — een schoor met speling doet niets. Montage: voorrand eerst 3–5 mm opkrikken, dan boren en bouten.`});
+  }
+  // DETAIL D: jaloezie-paneel
+  if(nPan2||opt.wandLat){
+    let a=[];
+    a.push(`<rect x="80" y="60" width="90" height="180" fill="#8f867a" stroke="#181613" stroke-width="2"/>`);
+    a.push(`<rect x="430" y="60" width="90" height="180" fill="#8f867a" stroke="#181613" stroke-width="2"/>`);
+    a.push(`<rect x="170" y="96" width="28" height="120" fill="#6f675c" stroke="#181613"/>`);
+    a.push(`<rect x="402" y="96" width="28" height="120" fill="#6f675c" stroke="#181613"/>`);
+    for(let i=0;i<6;i++) a.push(`<rect x="170" y="${64+i*30}" width="260" height="16" fill="#26231f"/>`);
+    a.push(`<text class="dt" x="300" y="270">bovenaanzicht · lat vlak met het paalvlak</text>`);
+    a.push(dimV(64,94,560,'h.o.h. 10 · spleet 3'));
+    a.push(dimH(170,430,46,`lat ${latL}`));
+    det.push({t:'Detail D — jaloezie-paneel in het duo-vak', svg:`<svg viewBox="0 0 600 300">${a.join('')}</svg>`,
+      cap:`Paneel <b>prefab op de werkbank</b>: ${nLat} latten 2,2 × 7 à ${latL} op twee regels 4,5 × 7 (h.o.h. 10, afstandsklosje 3 cm als maat). Paneel tussen de palen schuiven, regels tegen de paal-binnenzijden (5× RVS 6×90 per regel) — de latvoorkant ligt vlak met het paalvlak. Onderste lat op 30 boven maaiveld.`});
+  }
+  // DETAIL E: dakhout op de ligger
+  {
+    let a=[];
+    a.push(`<rect x="150" y="150" width="300" height="90" fill="#c9c2b4" stroke="#181613" stroke-width="2"/>`);
+    a.push(`<rect x="255" y="${opt.balk?60:106}" width="90" height="${opt.balk?90:44}" fill="#26231f" stroke="#181613"/>`);
+    a.push(`<line x1="300" y1="${opt.balk?70:112}" x2="340" y2="200" stroke="#181613" stroke-width="4"/>`);
+    a.push(`<text class="dt" x="300" y="46">${opt.balk?'balk 15×15':'lamel 4,5×7 op hun kant'}</text>`);
+    a.push(`<text class="dt" x="300" y="270">houtdraadbout 8 × ${opt.balk?220:160}, schuin voorgeboord van bovenaf${opt.balk?' (2 per kruising)':''}</text>`);
+    det.push({t:'Detail E — dakhout op de ligger', svg:`<svg viewBox="0 0 600 300">${a.join('')}</svg>`,
+      cap:`Per kruising ${opt.balk?'2 houtdraadbouten':'1 houtdraadbout'} schuin door het dakhout in de ligger — voorboren tegen splijten. Koppen na montage in één keer langs een smetlijn op 30 cm overstek afzagen en zwart bijwerken.`});
+  }
+  const detHtml = det.map(d=>`<div class="det"><h3>${d.t}</h3>${d.svg}<p>${d.cap}</p></div>`).join('');
+
+  /* — zaaglijst — */
+  const zl=[];
+  zl.push(['staander','15 × 15',H,nP,`${nP}× ${handelslengte(H)}`]);
+  if(opt.massief) zl.push(['ligger massief','15 × 15',D,2,`2× ${handelslengte(D)}`]);
+  else zl.push(['sandwich-balk','5 × 20',D,4,`4× ${handelslengte(D)}`]);
+  zl.push(['koppelbalk (achterrand, vol breed)','5 × 20',B,1,`1× ${handelslengte(B)}`]);
+  zl.push(['voorbalk (voorrand, vol breed)','5 × 20',B,1,`1× ${handelslengte(B)}`]);
+  zl.push([opt.balk?'dakbalk':'lamel',opt.balk?'15 × 15':'4,5 × 7',B,fx.nLam,`${fx.nLam}× ${handelslengte(B+10)} (op smetlijn afzagen)`]);
+  if(nS) zl.push(['kleine schoor (45°-koppen)','15 × 15',schL,nS,nS===2?`1× 300 (samen)`:`1× ${handelslengte(schL)}`]);
+  const nPan2=(opt.panZ?1:0)+(opt.panP?1:0);
+  if(nPan2){ zl.push(['jaloezie-lat (panelen)','2,2 × 7',latL,nLat*nPan2,`spleet 3 · h.o.h. 10`]); zl.push(['paneel-regel','4,5 × 7',H-50,nPan2*2,'']); }
+  if(opt.wandLat){ zl.push(['jaloezie-lat (achterwand)','2,2 × 7',B-75,nLat,'spleet 3 · h.o.h. 10 · 2 tussenregels']); zl.push(['wand-regel','4,5 × 7',H-50,2,'']); }
+  if(opt.wandRol) zl.push(['buitenrolgordijn antraciet','op maat',B-75,1,'aan de koppelbalk · bij storm oprollen']);
+  zl.push(['karbeel (45°-koppen)','7 × 7',75,2,'']);
+  const zlHtml=zl.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td class="n">${r[2]}</td><td class="n">${r[3]}</td><td>${r[4]}</td></tr>`).join('');
+
+  /* — bevestigingslijst — */
+  const bo=[];
+  bo.push(['slotbout M12 × 260 + ring/moer', 6 + 2*nS + (opt.hoekpaal?6:4), 'boutgroepen paalkoppen (driehoek zweef-duo!) + schoorkoppen']);
+  if(nS) bo.push(['slotbout M12 × 320', 2*nS, 'schoorvoeten (of 3 cm inkepen)']);
+  bo.push(['slotbout M12 × 160 (voeten)', 2*nP+1, 'paalvoeten in H-ankers · achterpaal zweef-zijde 3 st']);
+  bo.push(['carrosseriering ø45', 6, 'onder kop en moer, trek-boutgroep achterpaal']);
+  bo.push([`houtdraadbout 8 × ${opt.balk?220:160}`, fx.nLam*2, 'dakhout op de liggers, schuin voorgeboord']);
+  if(opt.paneel) bo.push(['RVS schroef 4,5 × 45 + 6 × 90', nLat*2*4+20, 'latten op regels · regels aan palen']);
+  if(opt.poeren) bo.push(['prefab poer 30×30 + verstelbare plaatdrager', nP, 'trekpositie: plaatdrager trekvast (moeren boven + onder) op het tegelanker-draadeind']);
+  else bo.push(['H-anker paal 15×15 (been ≥ 60)', nP, '1× uitvoeren als trekanker met dwarsstaaf ø12']);
+  bo.push(['hoekverbinder zwart 90×90', 12, 'voorbalk/koppelbalk aan de ligger-koppen + hoekpunten dakhout']);
+  bo.push(['afdekdop M12 zwart', 30, 'alle boutkoppen in het zicht']);
+  const boHtml=bo.map(r=>`<tr><td>${r[0]}</td><td class="n">${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+
+  /* — kostencalculatie — */
+  const K=kosten(fx);
+  const kHtml=K.r.map(x=>`<tr><td>${x.o}</td><td class="n">${x.q} ${x.u==='post'?'':x.u}</td><td class="n">€ ${x.pr.toFixed(2)}</td><td class="n">€ ${x.tot.toFixed(0)}</td><td>${x.shop}</td><td class="n">[${x.br}]</td></tr>`).join('')
+    + `<tr style="font-weight:700;border-top:2px solid #181613"><td>TOTAAL MATERIAAL</td><td></td><td></td><td class="n">± € ${K.tot}</td><td></td><td></td></tr>`;
+  const brHtml=BRONNEN.map(b2=>`<li><b>[${b2[0]}]</b> ${b2[1]}</li>`).join('');
+  const drukTxt = opt.fundDruk==='antraciet'? 'gadero-poer antraciet 14 × 14 × 50 met 28 × 28-voet + verstelplaat M16' : 'prefab betonpoer 30 × 30 met verstelbare plaatdrager';
+  const trekTxt = opt.fundTrek==='tegel'
+    ? `het <b>tegelanker</b>: 2 betontegels 60 × 60 op 70 diep, draadeind M16 × 100 met schotelplaat + moer ónder de tegels, dóór het gat van de poer omhoog, plaatdrager trekvast (moeren boven + onder); put in lagen van 15 verdicht terugvullen — géén gestort beton`
+    : opt.fundTrek==='b2'
+    ? `een <b>prefab trekpoer met 2 dwarsstangen ø12 + kraag van 4 zakken snelbeton</b> (draadeind dóór de poer, plaat + moer onder; niet op slappe grond)`
+    : `een <b>gestorte trekpoer ${fx.poerZ} × ${fx.poerZ} × 70</b> met zwaar H-anker en dwarsstaaf ø12 (±${Math.ceil((fx.poerZ/100)*(fx.poerZ/100)*0.7/0.0125)} zakken snelbeton)`;
+  const fundTxt = opt.poeren
+    ? `<b>Fundering (gekozen opties):</b> drukpalen op ${drukTxt}, vorstvrij (60–70 diep, onderin verdicht zand). Onder de <b>zweef-achterpaal</b> ${trekTxt}. Houdvermogen trekanker ≈ ${fx.capTrek} kg = ${(fx.capTrek/Math.max(fx50.trek,1)).toFixed(1)}× de trek.`
+    : `<b>Fundering — sleufblokken:</b> blok paal-zijde ${blokP} × 50 × 60 (geen trek); beton totaal ±${m3} m³ mortelbeton.`;
+
+  const html=`<!doctype html><html lang="nl"><head><meta charset="utf-8"><title>Bouwtekening zwevende pergola ${B} × ${D}</title>
+<style>
+  body{font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;color:#181613;margin:0;background:#fff}
+  .page{max-width:1000px;margin:0 auto;padding:28px 34px}
+  h1{font-size:1.35rem;margin:.2rem 0 .1rem} h2{font-size:.95rem;margin:1.6rem 0 .4rem;border-bottom:2px solid #181613;padding-bottom:.2rem}
+  .meta{font-family:ui-monospace,Menlo,monospace;font-size:.72rem;color:#666;letter-spacing:.06em}
+  svg{width:100%;height:auto;background:#fafaf7;border:1px solid #ddd;border-radius:4px;margin:.4rem 0}
+  .dim{stroke:#555;stroke-width:.9} .dt{font:600 11px ui-monospace,Menlo,monospace;fill:#181613;text-anchor:middle}
+  table{border-collapse:collapse;width:100%;font-size:.8rem;margin:.3rem 0}
+  th{font-family:ui-monospace,Menlo,monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;text-align:left;border-bottom:2px solid #181613;padding:.3rem .5rem}
+  td{border-bottom:1px solid #ddd;padding:.28rem .5rem} td.n{text-align:right;font-family:ui-monospace,Menlo,monospace}
+  .kader{border:1px solid #999;border-radius:4px;padding:.6rem .9rem;font-size:.8rem;margin:.5rem 0;background:#f7f6f2}
+  .dets{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .det h3{font-size:.8rem;margin:.2rem 0 .2rem;font-family:ui-monospace,Menlo,monospace}
+  .det p{font-size:.74rem;line-height:1.45;margin:.2rem 0 0;color:#333}
+  .det{page-break-inside:avoid}
+  @media (max-width:760px){.dets{grid-template-columns:1fr}}
+  .btn{position:fixed;top:14px;right:14px;padding:.6rem 1rem;font:600 .85rem system-ui;cursor:pointer;border:1px solid #999;border-radius:8px;background:#fff}
+  @media print{.btn{display:none}.page{padding:0} h2{page-break-after:avoid} svg,table{page-break-inside:avoid}}
+</style></head><body>
+<button class="btn" onclick="window.print()">🖨 afdrukken / bewaar als PDF</button>
+<div class="page">
+  <h1>Zwevende pergola — technische bouwtekening</h1>
+  <div class="meta">gegenereerd ${datum} · maten in cm tenzij anders vermeld · douglas zwart gedompeld · wip-principe met duo-staanders</div>
+  <div class="kader"><b>Configuratie:</b> dak ${B} × ${D} · vrije zweef ${zweef} · duo h.o.h. ${duo} · oversteek achter ${over} · paalkop ${H} · dakhout ${opt.balk?'15×15 balken':'lamellen 4,5×7'} ${fx.nLam} st h.o.h. ±${Math.round(sLam)} · ${opt.hoekpaal?`voorhoekpaal ${terug} achter de voorrand`:'GEEN voorhoekpaal (beide zijden zweven!)'} · schoren: ${opt.schoorZ?'zweef-zijde ':''}${opt.schoorP?'paal-zijde ':''}${nS?`(${A}/${A}, 45°)`:'geen'} · liggers ${opt.massief?'massief 15×15':'sandwich 2× 5×20'} · panelen: ${nPan2? (opt.panZ?'zweef-zijde ':'')+(opt.panP?'paal-zijde':'') : 'geen'} · achterwand: ${opt.wandLat?'latten':opt.wandRol?'rolgordijn':'open'} · ${opt.doek?'met schaduwdoek':'zonder doek'} · fundering: ${opt.poeren?'losse poeren (variant B)':'sleufblokken (variant A)'} · richtprijs materiaal ±€ ${K.tot}
+  <br><b>Krachten zweef-duo:</b> eigen gewicht trek ±${fx0.trek} kg · rekenwaarde (50 kg/m² storm + natte sneeuw) trek ±${fx50.trek} kg, druk ±${fx50.druk} kg · blok ${fx.blokL}×50×70 ≈ ${fx.blokKg} kg = ${(fx.blokKg/Math.max(fx50.trek,1)).toFixed(1)}× zekerheid · hout totaal ±${fx.wHout} kg</div>
+
+  <h2>1 · Bovenaanzicht (voorzijde boven)</h2>
+  ${bovenSvg}
+
+  <h2>2 · Zijaanzicht zweef-duo (van voren gezien rechts) — voorzijde links</h2>
+  ${zijSvg}
+  <div class="kader">Paal-zijde: identiek duo; de voorhoekpaal staat op <b>${zH-zV} cm vóór het duo-voorpaal-hart</b> (= ${terug} achter de voorrand). ${fundTxt} Bovenkant beton 5 cm boven maaiveld, afgesmeerd op afschot; 2 weken uitharden vóór het dak erop gaat.</div>
+
+  <h2>3 · Verbindingsdetails — hier zit het vakwerk</h2>
+  <div class="dets">${detHtml}</div>
+
+  <h2>4 · Zaaglijst</h2>
+  <table><thead><tr><th>onderdeel</th><th>doorsnede (cm)</th><th>lengte (cm)</th><th>aantal</th><th>uit handelslengte / opmerking</th></tr></thead><tbody>${zlHtml}</tbody></table>
+
+  <h2>5 · Bevestiging &amp; ankers</h2>
+  <table><thead><tr><th>artikel</th><th>aantal</th><th>toepassing</th></tr></thead><tbody>${boHtml}</tbody></table>
+
+  <h2>6 · Uitvoeringsnotities (kritiek)</h2>
+  <div class="kader">
+  1. Ankers exact stellen: duo-rechthoek ${B-60} × ${duo}, diagonalen gelijk${opt.hoekpaal?`; voorhoekpaal op ${zH-zV} vóór het voorpaal-hart, in de balklijn`:''}. Dit is het enige onherstelbare moment.<br>
+  2. Boutgaten exact ø13 (niet ruimer). Trek-boutgroep achterpaal zweef-zijde: 3× M12 in driehoek met carrosserieringen.<br>
+  3. Voorrand ±3–5 mm vóórspannen (krik) vóór het aantrekken${nS?'; kleine schoor er strak ingeklemd':''}.<br>
+  4. Alle slotbouten natrekken na de eerste zomer én na het eerste jaar — eerst ${nS?'schoorvoeten en ':''}trekverbinding.<br>
+  5. Dakhout: beide liggers afschrijven, monteren, koppen langs smetlijn in één keer op 30 overstek afzagen.<br>
+  6. Niets ophangen aan de zwevende voorrand (schommel/hangmat). Doek bij storm altijd opgevouwen, 's winters binnen.
+  </div>
+  <h2>7 · Bestellijst &amp; kosten (incl. btw)</h2>
+  <table><thead><tr><th>onderdeel</th><th>hoeveelheid</th><th>prijs p.e.</th><th>totaal</th><th>bestellen bij</th><th>bron</th></tr></thead><tbody>${kHtml}</tbody></table>
+  <div class="kader"><b>Bronnen</b> (online geraadpleegd 12-07-2026):<ol style="margin:.3rem 0 .3rem 1.1rem;padding:0">${brHtml}</ol>
+  Richtprijzen ±10%, exclusief bezorging en gereedschap. Tip: bestel al het hout in één keer bij één handel (bijv. houtgemak.nl of een lokale houthandel) — dat scheelt bezorgkosten en vaak 10–15% op de bouwpakket-prijs. Zwart gedompeld af fabriek is ±15–20% duurder dan blank; zelf 2× zwart beitsen kost ±€ 60 aan beits en een dag werk.</div>
+  <div class="meta" style="margin-top:14px">bron: Pergola Studio · dit blad vervangt geen constructeursberekening voor vergunningsplichtige situaties</div>
+</div>
+</body></html>`;
+
+  // als blob openen: een via document.write gevuld about:blank-tabblad print in Safari als lege PDF
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  if(!w){
+    const a=document.createElement('a');
+    a.href=url; a.download='bouwtekening-pergola.html';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+}
+document.getElementById('bSave').onclick=openTekening;
+
+buildModel(); updUI(); draw(); tick();
+</script>
+</body>
+</html>
